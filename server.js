@@ -1,9 +1,10 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const chessModule = require('chess.js');
 
-const Chess = chessModule.Chess || chessModule;
+// chess.js modülünü hem ES6 hem CommonJS sürümlerine tam uyumlu başlatıyoruz
+const chessModule = require('chess.js');
+const Chess = typeof chessModule === 'function' ? chessModule : (chessModule.Chess || chessModule.default);
 
 const app = express();
 const server = http.createServer(app);
@@ -11,7 +12,6 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// Oyun Odası Verisi
 let game = new Chess();
 let players = { white: null, black: null };
 let whiteTime = 600;
@@ -22,7 +22,7 @@ function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
   
   timerInterval = setInterval(() => {
-    if (game.game_over()) {
+    if (game.game_over && game.game_over()) {
       clearInterval(timerInterval);
       return;
     }
@@ -46,29 +46,24 @@ function startTimer() {
 }
 
 io.on('connection', (socket) => {
-  // Her bağlanan oyuncuyu aynı odaya al
   socket.join('gameRoom');
 
-  // Oyuncu rollerini atama
   if (!players.white) {
     players.white = socket.id;
     socket.emit('playerRole', 'w');
   } else if (!players.black) {
     players.black = socket.id;
     socket.emit('playerRole', 'b');
-    startTimer(); // İkinci oyuncu girince sayacı başlat
+    startTimer();
   } else {
     socket.emit('spectatorRole');
   }
 
-  // Anlık tahta durumunu o an bağlanan kişiye gönder
   socket.emit('boardState', { fen: game.fen(), whiteTime, blackTime });
 
-  // Hamle alma
   socket.on('move', (moveData) => {
     const turn = game.turn();
 
-    // Sıra kontrolü
     if ((turn === 'w' && socket.id !== players.white) || 
         (turn === 'b' && socket.id !== players.black)) {
       socket.emit('boardState', { fen: game.fen(), whiteTime, blackTime });
@@ -78,7 +73,6 @@ io.on('connection', (socket) => {
     try {
       const result = game.move(moveData);
       if (result) {
-        // Hamle geçerliyse odadaki HERKESE bildir
         io.to('gameRoom').emit('boardState', { fen: game.fen(), whiteTime, blackTime });
       } else {
         socket.emit('boardState', { fen: game.fen(), whiteTime, blackTime });
@@ -103,5 +97,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Sunucu ${PORT} portunda çalışıyor.`);
+  console.log(`Sunucu ${PORT} portunda başarıyla çalışıyor.`);
 });
