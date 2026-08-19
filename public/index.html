@@ -42,7 +42,6 @@
       padding: 20px;
     }
 
-    /* TOAST BİLDİRİM SİSTEMİ */
     #toast-container {
       position: fixed;
       top: 24px;
@@ -275,12 +274,15 @@
       cursor: pointer;
     }
 
+    /* KONTRAST DÜZENLEMESİ (BEYAZ VE SIYAH KARELER) */
     .white-1e1d3 {
-      background-color: #383b42 !important;
+      background-color: #3d414a !important;
+      color: #71717a !important;
     }
 
     .black-3c85d {
-      background-color: #1c1d21 !important;
+      background-color: #212328 !important;
+      color: #4b4d54 !important;
     }
 
     .highlight-move {
@@ -463,7 +465,6 @@
 </head>
 <body>
 
-  <!-- Toast Bildirim Kabı -->
   <div id="toast-container"></div>
 
   <div id="lobby-screen">
@@ -543,7 +544,6 @@
     const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
     const startingPieces = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
 
-    // MODERN TOAST BİLDİRİM FONKSİYONU
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
@@ -559,8 +559,9 @@
       }, 3500);
     }
 
+    // YÜKSEK KONTRASTLI 'MAESTRO' TAŞ TEMA SETİ
     function pieceTheme(piece) {
-      return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/alpha/' + piece + '.svg';
+      return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/maestro/' + piece + '.svg';
     }
 
     function playSound(isCapture) {
