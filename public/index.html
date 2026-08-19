@@ -2,142 +2,347 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Online Satranç</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OLED Satranç Studio</title>
+  
+  <!-- Modern Tipografi (Plus Jakarta Sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chessboard.js CSS -->
   <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+  
   <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 100vh; margin: 0; background-color: #121212; color: #fff;
+    :root {
+      --bg-main: #050505;
+      --bg-card: #0e0e11;
+      --bg-card-hover: #16161c;
+      --border-color: #1e1e24;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-orange: #f97316;
+      --text-main: #f3f4f6;
+      --text-muted: #71717a;
     }
 
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      padding: 20px;
+    }
+
+    /* LOBİ EKRANI */
     #lobby-screen {
-      display: flex; flex-direction: column; align-items: center;
-      background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-      width: 360px; max-width: 90vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 36px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+      width: 380px;
+      max-width: 95vw;
     }
-    .input-group { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-bottom: 20px; }
+
+    #lobby-screen h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+      color: var(--text-main);
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+
+    .input-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     input[type="text"] {
-      padding: 12px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white;
-      text-align: center; font-size: 1rem; font-weight: bold; text-transform: uppercase;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: #141418;
+      color: white;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      outline: none;
+      transition: border-color 0.2s;
     }
-    .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 15px; }
-    .theme-btn {
-      padding: 12px; border: 2px solid #333; background: #2a2a2a; color: white;
-      border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.2s; font-size: 0.85rem;
+
+    input[type="text"]:focus {
+      border-color: #3b82f6;
     }
-    .theme-btn.selected { border-color: #4CAF50; background: #333; }
 
     .action-btn {
-      width: 100%; padding: 14px; background: #4CAF50; color: white; border: none;
-      border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s;
+      width: 100%;
+      padding: 14px;
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.15s, background-color 0.2s;
     }
-    .action-btn:hover { background: #45a049; }
 
-    #game-screen { display: none; flex-direction: column; align-items: center; }
-    
-    .room-bar {
-      display: flex; align-items: center; gap: 10px; background: #2a2a2a;
-      padding: 8px 15px; border-radius: 8px; margin-bottom: 10px; font-size: 0.9rem;
+    .action-btn:hover {
+      background: #e5e7eb;
+      transform: translateY(-1px);
     }
+
+    /* OYUN EKRANI */
+    #game-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 10px 16px;
+      border-radius: 12px;
+    }
+
+    .room-badge {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .room-badge strong {
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
     .copy-btn {
-      background: #2196F3; color: white; border: none; padding: 6px 12px;
-      border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.8rem;
+      background: #1e1e24;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: background 0.2s;
     }
 
+    .copy-btn:hover {
+      background: #2a2a32;
+    }
+
+    /* SAYAÇ KARTLARI */
     .timer-container {
-      display: flex; justify-content: space-between; width: 400px; max-width: 90vw;
-      margin: 10px 0; padding: 10px 15px; background: #2a2a2a; border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      gap: 12px;
     }
-    .timer { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
-    .timer.active { color: #4CAF50; }
 
-    /* Buton Paneli */
-    .control-buttons {
-      display: flex; gap: 10px; margin-top: 10px; width: 400px; max-width: 90vw;
+    .timer-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 12px;
+      transition: border-color 0.3s;
     }
-    .btn {
-      flex: 1; padding: 10px; border: none; border-radius: 6px;
-      font-weight: bold; cursor: pointer; transition: opacity 0.2s; color: white; font-size: 0.9rem;
-    }
-    .btn:hover { opacity: 0.85; }
-    .btn-resign { background-color: #e53935; }
-    .btn-restart { background-color: #fb8c00; }
 
-    /* Yenen Taşlar Paneli */
+    .timer-card.active {
+      border-color: var(--accent-green);
+      box-shadow: 0 0 15px rgba(34, 197, 94, 0.15);
+    }
+
+    .player-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .timer {
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-family: monospace;
+      color: var(--text-main);
+    }
+
+    .status-text {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: center;
+      min-height: 24px;
+    }
+
+    /* YENEN TAŞLAR PANELLERİ */
     .captured-pieces {
-      width: 400px; max-width: 90vw; min-height: 28px;
-      display: flex; align-items: center; gap: 4px;
-      background: #1a1a1a; padding: 4px 10px; border-radius: 4px; margin: 4px 0;
+      width: 100%;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 4px 12px;
+      border-radius: 8px;
     }
-    .captured-pieces img { width: 20px; height: 20px; }
+
+    .captured-pieces img {
+      width: 22px;
+      height: 22px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+
     .score-diff {
-      font-size: 0.8rem; font-weight: bold; color: #888; margin-left: 6px;
-      background: #2a2a2a; padding: 2px 6px; border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-main);
+      background: #22222a;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-left: auto;
     }
 
-    #board { width: 400px; max-width: 90vw; border-radius: 4px; overflow: hidden; }
+    /* TAHTA VE STİLİ */
+    #board {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+    }
 
-    /* TEMALAR */
-    .theme-classic .white-1e1d3 { background-color: #f0d9b5 !important; }
-    .theme-classic .black-3c85d { background-color: #b58863 !important; }
+    /* OLED Midnight Monokrom Tahta Renkleri */
+    .white-1e1d3 {
+      background-color: #383b42 !important;
+      color: #383b42;
+    }
 
-    .theme-wood .white-1e1d3 { background-color: #e3c16f !important; }
-    .theme-wood .black-3c85d { background-color: #b8860b !important; }
+    .black-3c85d {
+      background-color: #1c1d21 !important;
+      color: #1c1d21;
+    }
 
-    .theme-glass #board { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); }
-    .theme-glass .white-1e1d3 { background-color: rgba(255, 255, 255, 0.15) !important; }
-    .theme-glass .black-3c85d { background-color: rgba(0, 0, 0, 0.3) !important; }
+    /* KONTROL BUTONLARI */
+    .control-buttons {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      margin-top: 4px;
+    }
 
-    .theme-neon .white-1e1d3 { background-color: #1f293d !important; }
-    .theme-neon .black-3c85d { background-color: #0f172a !important; }
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--bg-card);
+      color: var(--text-main);
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .btn-resign:hover {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .btn-restart:hover {
+      border-color: var(--accent-orange);
+      color: var(--accent-orange);
+    }
   </style>
 </head>
 <body>
 
   <!-- LOBİ EKRANI -->
   <div id="lobby-screen">
-    <h2>Online Satranç</h2>
+    <h2>STUDIO CHESS</h2>
     
     <div class="input-group">
-      <label style="font-size: 0.85rem; color: #aaa;">Oda Kodu (İsteğe Bağlı):</label>
-      <input type="text" id="room-input" placeholder="Örn: ODA123" maxlength="10">
+      <label>Oda Kodu</label>
+      <input type="text" id="room-input" placeholder="Rastgele Veya Kod Girin" maxlength="10">
     </div>
 
-    <label style="font-size: 0.85rem; color: #aaa; margin-bottom: 8px;">Tema Seçin:</label>
-    <div class="theme-grid">
-      <button class="theme-btn selected" onclick="setTheme('classic', this)">♟️ Klasik</button>
-      <button class="theme-btn" onclick="setTheme('wood', this)">🪵 Ahşap</button>
-      <button class="theme-btn" onclick="setTheme('glass', this)">🧊 Saydam</button>
-      <button class="theme-btn" onclick="setTheme('neon', this)">⚡ Neon</button>
-    </div>
-
-    <button class="action-btn" onclick="joinGame()">Oyna / Odaya Katıl</button>
+    <button class="action-btn" onclick="joinGame()">Odaya Katıl</button>
   </div>
 
   <!-- OYUN EKRANI -->
   <div id="game-screen">
-    <div class="room-bar">
-      <span>Oda Kodu: <strong id="display-room-id">-</strong></span>
-      <button class="copy-btn" onclick="copyInviteLink()">Davet Linkini Kopyala</button>
+    <div class="top-bar">
+      <div class="room-badge">Oda Kodu: <strong id="display-room-id">-</strong></div>
+      <button class="copy-btn" onclick="copyInviteLink()">Davet Linki</button>
     </div>
 
     <div class="timer-container">
-      <div>Siyah: <span id="black-timer" class="timer">10:00</span></div>
-      <div>Beyaz: <span id="white-timer" class="timer">10:00</span></div>
+      <div id="black-timer-card" class="timer-card">
+        <span class="player-label">Siyah</span>
+        <span id="black-timer" class="timer">10:00</span>
+      </div>
+      <div id="white-timer-card" class="timer-card">
+        <span class="player-label">Beyaz</span>
+        <span id="white-timer" class="timer">10:00</span>
+      </div>
     </div>
 
-    <h3 id="status">Oyuncu bekleniyor...</h3>
+    <div id="status" class="status-text">Oyuncu bekleniyor...</div>
 
+    <!-- Üst Yenen Taşlar Paneli -->
     <div id="top-captured" class="captured-pieces"></div>
 
     <div id="board"></div>
 
+    <!-- Alt Yenen Taşlar Paneli -->
     <div id="bottom-captured" class="captured-pieces"></div>
 
     <div class="control-buttons">
-      <button class="btn btn-resign" onclick="resignGame()">🏳️ Pes Et</button>
-      <button class="btn btn-restart" onclick="restartGame()">🔄 Yeniden Başlat</button>
+      <button class="btn btn-resign" onclick="resignGame()">Pes Et</button>
+      <button class="btn btn-restart" onclick="restartGame()">Yeniden Başlat</button>
     </div>
   </div>
 
@@ -151,14 +356,19 @@
     const game = new Chess();
     let board = null;
     let myRole = null;
-    let selectedTheme = 'classic';
     let currentRoomId = '';
 
+    // Ses Efektleri
     const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
     const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
 
     const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
     const startingPieces = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
+
+    // Yüksek Çözünürlüklü Minimalist Alpha SVG Taş Seti
+    function pieceTheme(piece) {
+      return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/alpha/' + piece + '.svg';
+    }
 
     function playSound(isCapture) {
       if (isCapture) {
@@ -176,12 +386,6 @@
       document.getElementById('room-input').value = roomParam.toUpperCase();
     }
 
-    function setTheme(theme, btn) {
-      selectedTheme = theme;
-      document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-    }
-
     function generateRoomId() {
       return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
@@ -192,7 +396,6 @@
 
       document.getElementById('lobby-screen').style.display = 'none';
       document.getElementById('game-screen').style.display = 'flex';
-      document.body.className = 'theme-' + selectedTheme;
       document.getElementById('display-room-id').innerText = currentRoomId;
 
       socket.emit('joinRoom', currentRoomId);
@@ -202,7 +405,7 @@
     function copyInviteLink() {
       const inviteUrl = window.location.origin + '?room=' + currentRoomId;
       navigator.clipboard.writeText(inviteUrl).then(() => {
-        alert('Davet linki kopyalandı! Arkadaşına gönderebilirsin:\n' + inviteUrl);
+        alert('Davet linki kopyalandı! Arkadaşınla paylaşabilirsin:\n' + inviteUrl);
       });
     }
 
@@ -217,10 +420,6 @@
       if (confirm('Oyunu yeniden başlatmak istediğinize emin misiniz?')) {
         socket.emit('restartGame');
       }
-    }
-
-    function pieceTheme(piece) {
-      return 'https://chessboardjs.com/img/chesspieces/wikipedia/' + piece + '.png';
     }
 
     socket.on('playerRole', (role) => {
@@ -326,8 +525,9 @@
     function updateTimers(wTime, bTime, turn) {
       document.getElementById('white-timer').innerText = formatTime(wTime);
       document.getElementById('black-timer').innerText = formatTime(bTime);
-      document.getElementById('white-timer').classList.toggle('active', turn === 'w');
-      document.getElementById('black-timer').classList.toggle('active', turn === 'b');
+      
+      document.getElementById('white-timer-card').classList.toggle('active', turn === 'w');
+      document.getElementById('black-timer-card').classList.toggle('active', turn === 'b');
     }
 
     function formatTime(seconds) {
@@ -357,9 +557,9 @@
       } else if (game.in_draw()) {
         statusText = 'Oyun Berabere!';
       } else {
-        statusText = `Sıra: ${turnName}`;
-        if (myRole === 'w') statusText += ' (Sen: Beyaz)';
-        if (myRole === 'b') statusText += ' (Sen: Siyah)';
+        statusText = `Hamle Sırası: ${turnName}`;
+        if (myRole === 'w') statusText += ' • Sen: Beyaz';
+        if (myRole === 'b') statusText += ' • Sen: Siyah';
       }
       document.getElementById('status').innerText = statusText;
     }
