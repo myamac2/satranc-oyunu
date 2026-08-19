@@ -262,6 +262,11 @@
       color: #1c1d21;
     }
 
+    /* HAMLE VURGULAMA (HIGHLIGHT) STİLLERİ */
+    .highlight-move {
+      box-shadow: inset 0 0 0 1000px rgba(255, 215, 0, 0.28) !important;
+    }
+
     /* KONTROL BUTONLARI */
     .control-buttons {
       display: flex;
@@ -365,7 +370,6 @@
     const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
     const startingPieces = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
 
-    // Yüksek Çözünürlüklü Minimalist Alpha SVG Taş Seti
     function pieceTheme(piece) {
       return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/alpha/' + piece + '.svg';
     }
@@ -378,6 +382,15 @@
         moveSound.currentTime = 0;
         moveSound.play().catch(() => {});
       }
+    }
+
+    // Kare Vurgulama Yardımcı Fonksiyonları
+    function removeHighlights() {
+      $('#board .square-55d63').removeClass('highlight-move');
+    }
+
+    function highlightSquare(square) {
+      $('#board .square-' + square).addClass('highlight-move');
     }
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -444,6 +457,13 @@
       updateStatus();
       updateTimers(data.whiteTime, data.blackTime, game.turn());
       updateCapturedPieces();
+
+      // Hamle vurgulaması
+      removeHighlights();
+      if (data.lastMove) {
+        highlightSquare(data.lastMove.from);
+        highlightSquare(data.lastMove.to);
+      }
 
       if (fenChanged && data.lastMove) {
         playSound(!!data.lastMove.captured);
@@ -545,6 +565,11 @@
     function onDrop(source, target) {
       const move = game.move({ from: source, to: target, promotion: 'q' });
       if (move === null) return 'snapback';
+      
+      removeHighlights();
+      highlightSquare(source);
+      highlightSquare(target);
+
       socket.emit('move', { from: source, to: target, promotion: 'q' });
     }
 
