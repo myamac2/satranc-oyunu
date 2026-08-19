@@ -11,7 +11,6 @@
       min-height: 100vh; margin: 0; background-color: #121212; color: #fff;
     }
 
-    /* TEMA SEÇİM EKRANI (LOBİ) */
     #lobby-screen {
       display: flex; flex-direction: column; align-items: center;
       background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
@@ -23,10 +22,8 @@
     }
     .theme-btn:hover { border-color: #4CAF50; background: #333; transform: translateY(-2px); }
 
-    /* OYUN EKRANI */
     #game-screen { display: none; flex-direction: column; align-items: center; }
     
-    /* SAAT VE BİLGİ PANANOLARI */
     .timer-container {
       display: flex; justify-content: space-between; width: 400px;
       margin: 10px 0; padding: 10px 15px; background: #2a2a2a; border-radius: 8px;
@@ -36,29 +33,23 @@
 
     #board { width: 400px; max-width: 90vw; border-radius: 4px; overflow: hidden; }
 
-    /* TEMALARIN TAHTA STİLLERİ */
-    /* 1. Klasik Siyah-Beyaz */
-    .theme-classic .white-1e1d3 { background-color: #f0d9b5 !important; color: #b58863; }
-    .theme-classic .black-3c85d { background-color: #b58863 !important; color: #f0d9b5; }
+    /* TEMALAR */
+    .theme-classic .white-1e1d3 { background-color: #f0d9b5 !important; }
+    .theme-classic .black-3c85d { background-color: #b58863 !important; }
 
-    /* 2. Ahşap / Gerçekçi */
     .theme-wood .white-1e1d3 { background-color: #e3c16f !important; }
     .theme-wood .black-3c85d { background-color: #b8860b !important; }
 
-    /* 3. Saydam / Cam */
     .theme-glass #board { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); }
     .theme-glass .white-1e1d3 { background-color: rgba(255, 255, 255, 0.15) !important; }
     .theme-glass .black-3c85d { background-color: rgba(0, 0, 0, 0.3) !important; }
 
-    /* 4. Neon / Futuristic */
     .theme-neon .white-1e1d3 { background-color: #1f293d !important; }
     .theme-neon .black-3c85d { background-color: #0f172a !important; }
-    .theme-neon .square-55d63 { border: 1px solid rgba(56, 189, 248, 0.1); }
   </style>
 </head>
 <body>
 
-  <!-- LOBİ EKRANI -->
   <div id="lobby-screen">
     <h2>Satranç Tahtası Teması Seç</h2>
     <div class="theme-grid">
@@ -69,7 +60,6 @@
     </div>
   </div>
 
-  <!-- OYUN EKRANI -->
   <div id="game-screen">
     <div class="timer-container">
       <div>Siyah: <span id="black-timer" class="timer">10:00</span></div>
@@ -81,7 +71,6 @@
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"></script>
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
 
@@ -90,10 +79,8 @@
     const game = new Chess();
     let board = null;
     let myRole = null;
-    let selectedTheme = 'classic';
 
     function selectTheme(theme) {
-      selectedTheme = theme;
       document.getElementById('lobby-screen').style.display = 'none';
       document.getElementById('game-screen').style.display = 'flex';
       document.body.className = 'theme-' + theme;
@@ -107,11 +94,19 @@
     socket.on('playerRole', (role) => {
       myRole = role;
       updateStatus();
+      if (board) board.orientation(myRole === 'b' ? 'black' : 'white');
+    });
+
+    socket.on('spectatorRole', () => {
+      myRole = 's';
+      document.getElementById('status').innerText = 'Oda dolu (İzleyici Modu)';
     });
 
     socket.on('boardState', (data) => {
       game.load(data.fen);
-      if (board) board.position(data.fen);
+      if (board) {
+        board.position(data.fen, true); // Anlık animasyonlu konum güncelleme
+      }
       updateStatus();
       updateTimers(data.whiteTime, data.blackTime, game.turn());
     });
@@ -120,10 +115,14 @@
       updateTimers(data.whiteTime, data.blackTime, data.turn);
     });
 
+    socket.on('gameOver', (msg) => {
+      alert(msg);
+      document.getElementById('status').innerText = msg;
+    });
+
     function updateTimers(wTime, bTime, turn) {
       document.getElementById('white-timer').innerText = formatTime(wTime);
       document.getElementById('black-timer').innerText = formatTime(bTime);
-      
       document.getElementById('white-timer').classList.toggle('active', turn === 'w');
       document.getElementById('black-timer').classList.toggle('active', turn === 'b');
     }
@@ -143,6 +142,8 @@
     function onDrop(source, target) {
       const move = game.move({ from: source, to: target, promotion: 'q' });
       if (move === null) return 'snapback';
+      
+      // Geçerli hamleyi direkt sunucuya ilet
       socket.emit('move', { from: source, to: target, promotion: 'q' });
     }
 
