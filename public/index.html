@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Online Satranç</title>
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+  <style>
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #222; color: white; font-family: sans-serif; }
+    #board { width: 400px; }
+  </style>
+</head>
+<body>
+  <h2 id="status">Oyuncu bekleniyor...</h2>
+  <div id="board"></div>
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let board = null;
+    let myRole = null;
+
+    socket.on('playerRole', (role) => {
+      myRole = role;
+      document.getElementById('status').innerText = role === 'w' ? 'Beyazsın (Senin Sıran)' : 'Siyahsın (Rakip Bekleniyor)';
+      initBoard();
+    });
+
+    socket.on('spectatorRole', () => {
+      document.getElementById('status').innerText = 'Oda dolu, izleyici olarak katıldın.';
+      initBoard();
+    });
+
+    socket.on('boardState', (fen) => {
+      if (board) board.position(fen);
+    });
+
+    function onDrop(source, target) {
+      socket.emit('move', { from: source, to: target, promotion: 'q' });
+    }
+
+    function initBoard() {
+      if (board) return;
+      board = Chessboard('board', {
+        draggable: true,
+        position: 'start',
+        orientation: myRole === 'b' ? 'black' : 'white',
+        onDrop: onDrop
+      });
+    }
+  </script>
+</body>
+</html>
