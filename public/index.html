@@ -118,7 +118,7 @@
       transform: translateY(-1px);
     }
 
-    /* OYUN EKRANI (LIZARDS/DESKTOP YAN YANA DUZENI) */
+    /* OYUN EKRANI */
     #game-screen {
       display: none;
       flex-direction: row;
@@ -275,6 +275,12 @@
       box-shadow: inset 0 0 0 1000px rgba(255, 215, 0, 0.28) !important;
     }
 
+    /* ŞAH ÇEKİLME / MAT KIRMIZI PARLAMA EFEKTİ */
+    .check-square {
+      background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, rgba(220, 38, 38, 0.6) 50%, rgba(185, 28, 28, 0) 85%) !important;
+      box-shadow: inset 0 0 12px rgba(239, 68, 68, 0.8) !important;
+    }
+
     .legal-dot::after {
       content: '';
       position: absolute;
@@ -304,7 +310,7 @@
       background-color: transparent !important;
     }
 
-    /* SAĞ / ALT HAMLE GEÇMİŞİ PANELİ */
+    /* HAMLE GEÇMİŞİ PANELİ */
     .move-history-panel {
       width: 260px;
       height: 580px;
@@ -400,7 +406,6 @@
       color: var(--accent-orange);
     }
 
-    /* MOBİL UYUMLULUK: ALT ALTA DİZİLİM */
     @media (max-width: 768px) {
       #game-screen {
         flex-direction: column;
@@ -432,7 +437,6 @@
   <!-- OYUN EKRANI -->
   <div id="game-screen">
     
-    <!-- SOL: TAHTA VE SAYAÇLAR -->
     <div class="board-container">
       <div class="top-bar">
         <div class="room-badge">Oda Kodu: <strong id="display-room-id">-</strong></div>
@@ -464,7 +468,6 @@
       </div>
     </div>
 
-    <!-- SAĞ: HAMLE GEÇMİŞİ PNO PANELİ -->
     <div class="move-history-panel">
       <div class="panel-header">
         <span>Hamle Geçmişi</span>
@@ -508,7 +511,7 @@
     }
 
     function removeHighlights() {
-      $('#board .square-55d63').removeClass('highlight-move');
+      $('#board .square-55d63').removeClass('highlight-move check-square');
     }
 
     function highlightSquare(square) {
@@ -525,6 +528,27 @@
         $square.addClass('legal-capture');
       } else {
         $square.addClass('legal-dot');
+      }
+    }
+
+    // Şah karelerini bulup kırmızı parlama efekti uygulama
+    function highlightCheck() {
+      if (game.in_check() || game.in_checkmate()) {
+        const turn = game.turn();
+        const currentBoard = game.board();
+
+        for (let row = 0; row < 8; row++) {
+          for (let col = 0; col < 8; col++) {
+            const piece = currentBoard[row][col];
+            if (piece && piece.type === 'k' && piece.color === turn) {
+              const file = String.fromCharCode(97 + col);
+              const rank = 8 - row;
+              const kingSquare = file + rank;
+              $('#board .square-' + kingSquare).addClass('check-square');
+              return;
+            }
+          }
+        }
       }
     }
 
@@ -601,6 +625,8 @@
         highlightSquare(data.lastMove.to);
       }
 
+      highlightCheck();
+
       if (fenChanged && data.lastMove) {
         playSound(!!data.lastMove.captured);
       }
@@ -615,7 +641,6 @@
       document.getElementById('status').innerText = msg;
     });
 
-    // HAMLE GEÇMİŞİ LİSTESİNİ GÜNCELLE
     function updateMoveHistory() {
       const history = game.history();
       const listContainer = document.getElementById('history-list');
@@ -758,6 +783,7 @@
       removeHighlights();
       highlightSquare(source);
       highlightSquare(target);
+      highlightCheck();
 
       socket.emit('move', { from: source, to: target, promotion: 'q' });
     }
@@ -772,6 +798,7 @@
         statusText = 'Oyun Berabere!';
       } else {
         statusText = `Hamle Sırası: ${turnName}`;
+        if (game.in_check()) statusText += ' (ŞAH!)';
         if (myRole === 'w') statusText += ' • Sen: Beyaz';
         if (myRole === 'b') statusText += ' • Sen: Siyah';
       }
