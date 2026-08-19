@@ -13,6 +13,7 @@ let game = new Chess();
 let players = {};
 
 io.on('connection', (socket) => {
+  // Oyuncu rollerini belirle
   if (!players.white) {
     players.white = socket.id;
     socket.emit('playerRole', 'w');
@@ -23,28 +24,44 @@ io.on('connection', (socket) => {
     socket.emit('spectatorRole');
   }
 
+  // Mevcut tahta durumunu gönder
   socket.emit('boardState', game.fen());
 
-  socket.on('move', (move) => {
-    try {
-      if (game.turn() === 'w' && socket.id !== players.white) return;
-      if (game.turn() === 'b' && socket.id !== players.black) return;
+  socket.on('move', (moveData) => {
+    // Sıra hamle yapan oyuncuda mı kontrol et
+    const turn = game.turn();
+    if ((turn === 'w' && socket.id !== players.white) || 
+        (turn === 'b' && socket.id !== players.black)) {
+      socket.emit('boardState', game.fen());
+      return;
+    }
 
-      const result = game.move(move);
+    try {
+      const result = game.move(moveData);
       if (result) {
+        // Geçerli hamle: Tüm oyunculara yeni tahta durumunu ilet
         io.emit('boardState', game.fen());
+      } else {
+        // Geçersiz hamle: Tahtayı eski haline sıfırla
+        socket.emit('boardState', game.fen());
       }
     } catch (err) {
-      console.log("Geçersiz hamle:", move);
+      // Hata durumunda tahtayı senkronize et
+      socket.emit('boardState', game.fen());
     }
   });
 
   socket.on('disconnect', () => {
     if (socket.id === players.white) delete players.white;
     if (socket.id === players.black) delete players.black;
+    // Biri ayrılırsa oyunu sıfırla
+    if (!players.white && !players.black) {
+      game = new Chess();
+    }
   });
 });
 
-server.listen(3000, () => {
-  console.log('Satranç sunucusu hazır! http://localhost:3000 adresinden girebilirsin.');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });

@@ -5,39 +5,119 @@
   <title>Online Satranç</title>
   <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
   <style>
-    body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #222; color: white; font-family: sans-serif; }
-    #board { width: 400px; }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #1a1a1a;
+      color: #ffffff;
+      font-family: sans-serif;
+    }
+    #board {
+      width: 400px;
+      max-width: 90vw;
+    }
+    #status {
+      margin-bottom: 20px;
+      font-weight: 300;
+    }
   </style>
 </head>
 <body>
-  <h2 id="status">Oyuncu bekleniyor...</h2>
+  <h2 id="status">Bağlanılıyor...</h2>
   <div id="board"></div>
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
+
   <script>
     const socket = io();
+    const game = new Chess();
     let board = null;
     let myRole = null;
 
+    // Taş görsellerini CDN üzerinden çeken özel fonksiyon
+    function pieceTheme(piece) {
+      return 'https://chessboardjs.com/img/chesspieces/wikipedia/' + piece + '.png';
+    }
+
     socket.on('playerRole', (role) => {
       myRole = role;
-      document.getElementById('status').innerText = role === 'w' ? 'Beyazsın (Senin Sıran)' : 'Siyahsın (Rakip Bekleniyor)';
+      updateStatus();
       initBoard();
     });
 
     socket.on('spectatorRole', () => {
-      document.getElementById('status').innerText = 'Oda dolu, izleyici olarak katıldın.';
+      myRole = 's';
+      document.getElementById('status').innerText = 'Oda dolu (İzleyici Modu)';
       initBoard();
     });
 
     socket.on('boardState', (fen) => {
-      if (board) board.position(fen);
+      game.load(fen);
+      if (board) {
+        board.position(fen);
+      }
+      updateStatus();
     });
 
+    function onDragStart(source, piece) {
+      // Oyun bittiyse veya izleyiciyse taş sürüklenemez
+      if (game.game_over() || myRole === 's') return false;
+
+      // Sıra kimdeyse sadece kendi taşlarını sürükleyebilir
+      if ((game.turn() === 'w' && myRole !== 'w') ||
+          (game.turn() === 'b' && myRole !== 'b')) {
+        return false;
+      }
+
+      // Sadece kendi rengindeki taşları tutabilir
+      if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+          (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+        return false;
+      }
+    }
+
     function onDrop(source, target) {
+      // Hamlenin kurala uygunluğunu istemci tarafında yerel olarak kontrol et
+      const move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q'
+      });
+
+      // Geçersiz hamleyse taşı eski yerine fırlat
+      if (move === null) return 'snapback';
+
+      // Geçerli hamleyse sunucuya bildir
       socket.emit('move', { from: source, to: target, promotion: 'q' });
+    }
+
+    function onSnapEnd() {
+      board.position(game.fen());
+    }
+
+    function updateStatus() {
+      let statusText = '';
+      const turnName = game.turn() === 'w' ? 'Beyaz' : 'Siyah';
+
+      if (game.in_checkmate()) {
+        statusText = `Oyun bitti! Şah mat. Kazanan: ${turnName === 'Beyaz' ? 'Siyah' : 'Beyaz'}`;
+      } else if (game.in_draw()) {
+        statusText = 'Oyun bitti! Berabere.';
+      } else {
+        statusText = `Sıra: ${turnName}`;
+        if (myRole === 'w') statusText += ' (Sen: Beyaz)';
+        if (myRole === 'b') statusText += ' (Sen: Siyah)';
+        if (game.in_check()) statusText += ' - ŞAH!';
+      }
+
+      document.getElementById('status').innerText = statusText;
     }
 
     function initBoard() {
@@ -46,7 +126,10 @@
         draggable: true,
         position: 'start',
         orientation: myRole === 'b' ? 'black' : 'white',
-        onDrop: onDrop
+        pieceTheme: pieceTheme,
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd
       });
     }
   </script>
