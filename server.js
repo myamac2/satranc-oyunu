@@ -1,7 +1,18 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { Chess } = require('chess.js');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+
+const chessModule = require('chess.js');
+const Chess = chessModule.Chess || chessModule;
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+const Chess = chessModule.Chess || chessModule;
 
 const app = express();
 const server = http.createServer(app);

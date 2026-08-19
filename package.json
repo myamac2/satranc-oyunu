@@ -1,18 +1,14 @@
 {
-  "dependencies": {
-    "chess.js": "^1.4.0",
-    "express": "^5.2.1",
-    "socket.io": "^4.8.3"
-  },
-  "name": "satranc",
+  "name": "satranc-oyunu",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Satranc Oyunu",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "chess.js": "^0.13.4"
+  }
 }
