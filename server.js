@@ -11,52 +11,76 @@ app.use(express.static('public'));
 
 let game = new Chess();
 let players = {};
+let whiteTime = 600; // 10 dakika (saniye cinsinden)
+let blackTime = 600;
+let timerInterval = null;
+
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  
+  timerInterval = setInterval(() => {
+    if (game.game_over()) {
+      clearInterval(timerInterval);
+      return;
+    }
+
+    if (game.turn() === 'w') {
+      whiteTime--;
+      if (whiteTime <= 0) {
+        clearInterval(timerInterval);
+        io.emit('gameOver', 'Süre Bitti! Siyah Kazandı.');
+      }
+    } else {
+      blackTime--;
+      if (blackTime <= 0) {
+        clearInterval(timerInterval);
+        io.emit('gameOver', 'Süre Bitti! Beyaz Kazandı.');
+      }
+    }
+
+    io.emit('timerUpdate', { whiteTime, blackTime, turn: game.turn() });
+  }, 1000);
+}
 
 io.on('connection', (socket) => {
-  // Oyuncu rollerini belirle
   if (!players.white) {
     players.white = socket.id;
     socket.emit('playerRole', 'w');
   } else if (!players.black) {
     players.black = socket.id;
     socket.emit('playerRole', 'b');
+    startTimer(); // İkinci oyuncu girince 10dk sayacı başlat
   } else {
     socket.emit('spectatorRole');
   }
 
-  // Mevcut tahta durumunu gönder
-  socket.emit('boardState', game.fen());
+  socket.emit('boardState', { fen: game.fen(), whiteTime, blackTime });
 
   socket.on('move', (moveData) => {
-    // Sıra hamle yapan oyuncuda mı kontrol et
     const turn = game.turn();
     if ((turn === 'w' && socket.id !== players.white) || 
         (turn === 'b' && socket.id !== players.black)) {
-      socket.emit('boardState', game.fen());
       return;
     }
 
     try {
       const result = game.move(moveData);
       if (result) {
-        // Geçerli hamle: Tüm oyunculara yeni tahta durumunu ilet
-        io.emit('boardState', game.fen());
-      } else {
-        // Geçersiz hamle: Tahtayı eski haline sıfırla
-        socket.emit('boardState', game.fen());
+        io.emit('boardState', { fen: game.fen(), whiteTime, blackTime });
       }
     } catch (err) {
-      // Hata durumunda tahtayı senkronize et
-      socket.emit('boardState', game.fen());
+      socket.emit('boardState', { fen: game.fen(), whiteTime, blackTime });
     }
   });
 
   socket.on('disconnect', () => {
     if (socket.id === players.white) delete players.white;
     if (socket.id === players.black) delete players.black;
-    // Biri ayrılırsa oyunu sıfırla
     if (!players.white && !players.black) {
       game = new Chess();
+      whiteTime = 600;
+      blackTime = 600;
+      clearInterval(timerInterval);
     }
   });
 });

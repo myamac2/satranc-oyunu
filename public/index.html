@@ -5,33 +5,83 @@
   <title>Online Satranç</title>
   <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
   <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background-color: #1a1a1a;
-      color: #ffffff;
-      font-family: sans-serif;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; margin: 0; background-color: #121212; color: #fff;
     }
-    #board {
-      width: 400px;
-      max-width: 90vw;
+
+    /* TEMA SEÇİM EKRANI (LOBİ) */
+    #lobby-screen {
+      display: flex; flex-direction: column; align-items: center;
+      background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
-    #status {
-      margin-bottom: 20px;
-      font-weight: 300;
+    .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+    .theme-btn {
+      padding: 15px 25px; border: 2px solid #333; background: #2a2a2a; color: white;
+      border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.2s;
     }
+    .theme-btn:hover { border-color: #4CAF50; background: #333; transform: translateY(-2px); }
+
+    /* OYUN EKRANI */
+    #game-screen { display: none; flex-direction: column; align-items: center; }
+    
+    /* SAAT VE BİLGİ PANANOLARI */
+    .timer-container {
+      display: flex; justify-content: space-between; width: 400px;
+      margin: 10px 0; padding: 10px 15px; background: #2a2a2a; border-radius: 8px;
+    }
+    .timer { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
+    .timer.active { color: #4CAF50; }
+
+    #board { width: 400px; max-width: 90vw; border-radius: 4px; overflow: hidden; }
+
+    /* TEMALARIN TAHTA STİLLERİ */
+    /* 1. Klasik Siyah-Beyaz */
+    .theme-classic .white-1e1d3 { background-color: #f0d9b5 !important; color: #b58863; }
+    .theme-classic .black-3c85d { background-color: #b58863 !important; color: #f0d9b5; }
+
+    /* 2. Ahşap / Gerçekçi */
+    .theme-wood .white-1e1d3 { background-color: #e3c16f !important; }
+    .theme-wood .black-3c85d { background-color: #b8860b !important; }
+
+    /* 3. Saydam / Cam */
+    .theme-glass #board { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); }
+    .theme-glass .white-1e1d3 { background-color: rgba(255, 255, 255, 0.15) !important; }
+    .theme-glass .black-3c85d { background-color: rgba(0, 0, 0, 0.3) !important; }
+
+    /* 4. Neon / Futuristic */
+    .theme-neon .white-1e1d3 { background-color: #1f293d !important; }
+    .theme-neon .black-3c85d { background-color: #0f172a !important; }
+    .theme-neon .square-55d63 { border: 1px solid rgba(56, 189, 248, 0.1); }
   </style>
 </head>
 <body>
-  <h2 id="status">Bağlanılıyor...</h2>
-  <div id="board"></div>
+
+  <!-- LOBİ EKRANI -->
+  <div id="lobby-screen">
+    <h2>Satranç Tahtası Teması Seç</h2>
+    <div class="theme-grid">
+      <button class="theme-btn" onclick="selectTheme('classic')">♟️ Klasik Siyah-Beyaz</button>
+      <button class="theme-btn" onclick="selectTheme('wood')">🪵 Ahşap / Gerçekçi</button>
+      <button class="theme-btn" onclick="selectTheme('glass')">🧊 Saydam / Cam</button>
+      <button class="theme-btn" onclick="selectTheme('neon')">⚡ Neon / Cyber</button>
+    </div>
+  </div>
+
+  <!-- OYUN EKRANI -->
+  <div id="game-screen">
+    <div class="timer-container">
+      <div>Siyah: <span id="black-timer" class="timer">10:00</span></div>
+      <div>Beyaz: <span id="white-timer" class="timer">10:00</span></div>
+    </div>
+    <h3 id="status">Oyuncu bekleniyor...</h3>
+    <div id="board"></div>
+  </div>
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"></script>
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
 
@@ -40,8 +90,16 @@
     const game = new Chess();
     let board = null;
     let myRole = null;
+    let selectedTheme = 'classic';
 
-    // Taş görsellerini CDN üzerinden çeken özel fonksiyon
+    function selectTheme(theme) {
+      selectedTheme = theme;
+      document.getElementById('lobby-screen').style.display = 'none';
+      document.getElementById('game-screen').style.display = 'flex';
+      document.body.className = 'theme-' + theme;
+      initBoard();
+    }
+
     function pieceTheme(piece) {
       return 'https://chessboardjs.com/img/chesspieces/wikipedia/' + piece + '.png';
     }
@@ -49,57 +107,43 @@
     socket.on('playerRole', (role) => {
       myRole = role;
       updateStatus();
-      initBoard();
     });
 
-    socket.on('spectatorRole', () => {
-      myRole = 's';
-      document.getElementById('status').innerText = 'Oda dolu (İzleyici Modu)';
-      initBoard();
-    });
-
-    socket.on('boardState', (fen) => {
-      game.load(fen);
-      if (board) {
-        board.position(fen);
-      }
+    socket.on('boardState', (data) => {
+      game.load(data.fen);
+      if (board) board.position(data.fen);
       updateStatus();
+      updateTimers(data.whiteTime, data.blackTime, game.turn());
     });
+
+    socket.on('timerUpdate', (data) => {
+      updateTimers(data.whiteTime, data.blackTime, data.turn);
+    });
+
+    function updateTimers(wTime, bTime, turn) {
+      document.getElementById('white-timer').innerText = formatTime(wTime);
+      document.getElementById('black-timer').innerText = formatTime(bTime);
+      
+      document.getElementById('white-timer').classList.toggle('active', turn === 'w');
+      document.getElementById('black-timer').classList.toggle('active', turn === 'b');
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
 
     function onDragStart(source, piece) {
-      // Oyun bittiyse veya izleyiciyse taş sürüklenemez
       if (game.game_over() || myRole === 's') return false;
-
-      // Sıra kimdeyse sadece kendi taşlarını sürükleyebilir
-      if ((game.turn() === 'w' && myRole !== 'w') ||
-          (game.turn() === 'b' && myRole !== 'b')) {
-        return false;
-      }
-
-      // Sadece kendi rengindeki taşları tutabilir
-      if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
-          (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
-        return false;
-      }
+      if ((game.turn() === 'w' && myRole !== 'w') || (game.turn() === 'b' && myRole !== 'b')) return false;
+      if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
     }
 
     function onDrop(source, target) {
-      // Hamlenin kurala uygunluğunu istemci tarafında yerel olarak kontrol et
-      const move = game.move({
-        from: source,
-        to: target,
-        promotion: 'q'
-      });
-
-      // Geçersiz hamleyse taşı eski yerine fırlat
+      const move = game.move({ from: source, to: target, promotion: 'q' });
       if (move === null) return 'snapback';
-
-      // Geçerli hamleyse sunucuya bildir
       socket.emit('move', { from: source, to: target, promotion: 'q' });
-    }
-
-    function onSnapEnd() {
-      board.position(game.fen());
     }
 
     function updateStatus() {
@@ -107,16 +151,14 @@
       const turnName = game.turn() === 'w' ? 'Beyaz' : 'Siyah';
 
       if (game.in_checkmate()) {
-        statusText = `Oyun bitti! Şah mat. Kazanan: ${turnName === 'Beyaz' ? 'Siyah' : 'Beyaz'}`;
+        statusText = `Şah Mat! Kazanan: ${turnName === 'Beyaz' ? 'Siyah' : 'Beyaz'}`;
       } else if (game.in_draw()) {
-        statusText = 'Oyun bitti! Berabere.';
+        statusText = 'Oyun Berabere!';
       } else {
         statusText = `Sıra: ${turnName}`;
         if (myRole === 'w') statusText += ' (Sen: Beyaz)';
         if (myRole === 'b') statusText += ' (Sen: Siyah)';
-        if (game.in_check()) statusText += ' - ŞAH!';
       }
-
       document.getElementById('status').innerText = statusText;
     }
 
@@ -129,7 +171,7 @@
         pieceTheme: pieceTheme,
         onDragStart: onDragStart,
         onDrop: onDrop,
-        onSnapEnd: onSnapEnd
+        onSnapEnd: () => board.position(game.fen())
       });
     }
   </script>
