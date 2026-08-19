@@ -102,7 +102,6 @@ io.on('connection', (socket) => {
     try {
       const result = room.game.move(moveData);
       if (result) {
-        // Hamle detayını (lastMove) istemcilere gönderiyoruz
         io.to(currentRoomId).emit('boardState', { 
           fen: room.game.fen(), 
           whiteTime: room.whiteTime, 
@@ -115,6 +114,48 @@ io.on('connection', (socket) => {
     } catch (err) {
       socket.emit('boardState', { fen: room.game.fen(), whiteTime: room.whiteTime, blackTime: room.blackTime });
     }
+  });
+
+  // Pes Etme İşlemi
+  socket.on('resign', () => {
+    if (!currentRoomId || !rooms[currentRoomId]) return;
+    const room = rooms[currentRoomId];
+    
+    if (room.timerInterval) clearInterval(room.timerInterval);
+
+    let winner = '';
+    if (socket.id === room.players.white) {
+      winner = 'Siyah (Beyaz pes etti)';
+    } else if (socket.id === room.players.black) {
+      winner = 'Beyaz (Siyah pes etti)';
+    } else {
+      return; // İzleyiciler pes edemez
+    }
+
+    io.to(currentRoomId).emit('gameOver', `Oyun Bitti! Kazanan: ${winner}`);
+  });
+
+  // Oyunu Yeniden Başlatma İşlemi
+  socket.on('restartGame', () => {
+    if (!currentRoomId || !rooms[currentRoomId]) return;
+    const room = rooms[currentRoomId];
+
+    room.game = new Chess();
+    room.whiteTime = 600;
+    room.blackTime = 600;
+    if (room.timerInterval) clearInterval(room.timerInterval);
+
+    if (room.players.white && room.players.black) {
+      startTimer(currentRoomId);
+    }
+
+    io.to(currentRoomId).emit('boardState', {
+      fen: room.game.fen(),
+      whiteTime: room.whiteTime,
+      blackTime: room.blackTime,
+      lastMove: null
+    });
+    io.to(currentRoomId).emit('gameStatus', 'Oyun yeniden başlatıldı!');
   });
 
   socket.on('disconnect', () => {

@@ -52,7 +52,19 @@
     .timer { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
     .timer.active { color: #4CAF50; }
 
-    /* Yenen Taşlar Panelleri */
+    /* Buton Paneli */
+    .control-buttons {
+      display: flex; gap: 10px; margin-top: 10px; width: 400px; max-width: 90vw;
+    }
+    .btn {
+      flex: 1; padding: 10px; border: none; border-radius: 6px;
+      font-weight: bold; cursor: pointer; transition: opacity 0.2s; color: white; font-size: 0.9rem;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-resign { background-color: #e53935; }
+    .btn-restart { background-color: #fb8c00; }
+
+    /* Yenen Taşlar Paneli */
     .captured-pieces {
       width: 400px; max-width: 90vw; min-height: 28px;
       display: flex; align-items: center; gap: 4px;
@@ -117,13 +129,16 @@
 
     <h3 id="status">Oyuncu bekleniyor...</h3>
 
-    <!-- Üst Yenen Taşlar Paneli (Rakibin Yediği / Siyah Yönü) -->
     <div id="top-captured" class="captured-pieces"></div>
 
     <div id="board"></div>
 
-    <!-- Alt Yenen Taşlar Paneli (Sizin Yediğiniz / Beyaz Yönü) -->
     <div id="bottom-captured" class="captured-pieces"></div>
+
+    <div class="control-buttons">
+      <button class="btn btn-resign" onclick="resignGame()">🏳️ Pes Et</button>
+      <button class="btn btn-restart" onclick="restartGame()">🔄 Yeniden Başlat</button>
+    </div>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -191,6 +206,19 @@
       });
     }
 
+    function resignGame() {
+      if (myRole === 's') return;
+      if (confirm('Pes etmek istediğinize emin misiniz?')) {
+        socket.emit('resign');
+      }
+    }
+
+    function restartGame() {
+      if (confirm('Oyunu yeniden başlatmak istediğinize emin misiniz?')) {
+        socket.emit('restartGame');
+      }
+    }
+
     function pieceTheme(piece) {
       return 'https://chessboardjs.com/img/chesspieces/wikipedia/' + piece + '.png';
     }
@@ -204,6 +232,10 @@
     socket.on('spectatorRole', () => {
       myRole = 's';
       document.getElementById('status').innerText = 'Oda dolu (İzleyici Modu)';
+    });
+
+    socket.on('gameStatus', (msg) => {
+      document.getElementById('status').innerText = msg;
     });
 
     socket.on('boardState', (data) => {
@@ -244,8 +276,8 @@
         }
       }
 
-      const capturedByWhite = []; // Siyahın eksilen taşları
-      const capturedByBlack = []; // Beyazın eksilen taşları
+      const capturedByWhite = [];
+      const capturedByBlack = [];
       let whiteScore = 0;
       let blackScore = 0;
 
@@ -269,7 +301,6 @@
       topDiv.innerHTML = '';
       bottomDiv.innerHTML = '';
 
-      // Oyuncu siyahsa tahtayı ters algılar
       const isBlackPlayer = myRole === 'b';
       const topPieces = isBlackPlayer ? capturedByBlack : capturedByWhite;
       const bottomPieces = isBlackPlayer ? capturedByWhite : capturedByBlack;
@@ -281,7 +312,6 @@
         bottomDiv.innerHTML += `<img src="${pieceTheme(p)}" alt="${p}">`;
       });
 
-      // Puan farkını yazdır
       const scoreDiff = whiteScore - blackScore;
       if (scoreDiff !== 0) {
         const diffText = scoreDiff > 0 ? `+${scoreDiff}` : `+${Math.abs(scoreDiff)}`;
