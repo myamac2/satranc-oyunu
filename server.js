@@ -1,203 +1,234 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
-
-const chessModule = require('chess.js');
-const Chess = chessModule.Chess || chessModule;
+const { Chess } = require('chess.js');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.use(express.static('public'));
 
 const rooms = {};
 
-function startRoomTimer(roomId) {
-  const room = rooms[roomId];
-  if (!room || room.timerInterval) return;
-
-  room.timerInterval = setInterval(() => {
-    if (!room.game || room.game.game_over()) {
-      clearInterval(room.timerInterval);
-      room.timerInterval = null;
-      return;
-    }
-
-    const turn = room.game.turn();
-    if (turn === 'w') {
-      room.whiteTime--;
-      if (room.whiteTime <= 0) {
-        room.whiteTime = 0;
-        clearInterval(room.timerInterval);
-        room.timerInterval = null;
-        io.to(roomId).emit('gameOver', 'Süre Bitti! Siyah Kazandı.');
-      }
-    } else {
-      room.blackTime--;
-      if (room.blackTime <= 0) {
-        room.blackTime = 0;
-        clearInterval(room.timerInterval);
-        room.timerInterval = null;
-        io.to(roomId).emit('gameOver', 'Süre Bitti! Beyaz Kazandı.');
-      }
-    }
-
-    io.to(roomId).emit('timerUpdate', {
-      whiteTime: room.whiteTime,
-      blackTime: room.blackTime,
-      turn: turn
-    });
-  }, 1000);
-}
-
-function resetRoomState(room) {
-  if (room.timerInterval) {
-    clearInterval(room.timerInterval);
-    room.timerInterval = null;
-  }
-  room.game = new Chess();
-  room.whiteTime = 600;
-  room.blackTime = 600;
-  room.lastMove = null;
-}
-
 io.on('connection', (socket) => {
-  socket.on('joinRoom', (roomId) => {
-    if (socket.roomId) {
-      socket.leave(socket.roomId);
-    }
+  let currentRoom = null;
+  let userRole = null;
 
-    socket.roomId = roomId;
-    socket.join(roomId);
+  socket.on('joinRoom', ({ roomId, timeConfig, isVsAi }) => {
+    currentRoom = roomId;
 
     if (!rooms[roomId]) {
+      const initialTime = timeConfig ? timeConfig.time * 60 : 600;
+      const increment = timeConfig ? timeConfig.inc : 0;
+
       rooms[roomId] = {
         game: new Chess(),
-        players: {},
-        whiteTime: 600,
-        blackTime: 600,
+        white: null,
+        black: null,
+        spectators: [],
+        timers: { w: initialTime, b: initialTime },
+        increment: increment,
+        initialTime: initialTime,
         timerInterval: null,
-        lastMove: null
+        lastMove: null,
+        isVsAi: !!isVsAi,
+        drawOffers: { w: false, b: false }
       };
     }
 
     const room = rooms[roomId];
-    const playerColors = Object.values(room.players);
 
-    if (!room.players[socket.id]) {
-      if (!playerColors.includes('w')) {
-        room.players[socket.id] = 'w';
-        socket.emit('playerRole', 'w');
-      } else if (!playerColors.includes('b')) {
-        room.players[socket.id] = 'b';
-        socket.emit('playerRole', 'b');
-      } else {
-        socket.emit('spectatorRole');
-      }
-    } else {
-      socket.emit('playerRole', room.players[socket.id]);
-    }
-
-    const currentPlayers = Object.keys(room.players).length;
-    if (currentPlayers === 1) {
-      io.to(roomId).emit('gameStatus', 'Rakip bekleniyor...');
-    } else if (currentPlayers >= 2) {
+    if (!room.white) {
+      room.white = socket.id;
+      userRole = 'w';
+      socket.emit('playerRole', 'w');
+    } else if (!room.black && !room.isVsAi) {
+      room.black = socket.id;
+      userRole = 'b';
+      socket.emit('playerRole', 'b');
       io.to(roomId).emit('gameStatus', 'Oyun Başladı!');
-      startRoomTimer(roomId);
+      startTimer(roomId);
+    } else if (room.isVsAi && !room.black) {
+      room.black = 'BOT';
+      userRole = 'w';
+      socket.emit('playerRole', 'w');
+      io.to(roomId).emit('gameStatus', 'Yapay Zekaya Karşı Oyun Başladı!');
+      startTimer(roomId);
+    } else {
+      userRole = 's';
+      room.spectators.push(socket.id);
+      socket.emit('spectatorRole');
     }
 
-    io.to(roomId).emit('boardState', {
-      fen: room.game.fen(),
-      whiteTime: room.whiteTime,
-      blackTime: room.blackTime,
-      lastMove: room.lastMove
-    });
+    socket.join(roomId);
+    sendBoardState(roomId);
   });
 
   socket.on('move', (moveData) => {
-    const room = rooms[socket.roomId];
+    const room = rooms[currentRoom];
     if (!room) return;
 
-    const playerColor = room.players[socket.id];
-    if (!playerColor || playerColor !== room.game.turn()) return;
+    const game = room.game;
+    if ((game.turn() === 'w' && userRole !== 'w') || (game.turn() === 'b' && userRole !== 'b')) return;
 
     try {
-      const move = room.game.move(moveData);
+      const move = game.move(moveData);
       if (move) {
-        room.lastMove = { from: move.from, to: move.to, captured: move.captured };
-        io.to(socket.roomId).emit('boardState', {
-          fen: room.game.fen(),
-          whiteTime: room.whiteTime,
-          blackTime: room.blackTime,
-          lastMove: room.lastMove
-        });
+        room.lastMove = move;
+        
+        // Increment ekle
+        if (move.color === 'w') room.timers.w += room.increment;
+        if (move.color === 'b') room.timers.b += room.increment;
 
-        if (room.game.in_checkmate()) {
-          io.to(socket.roomId).emit('gameOver', `Şah Mat! Kazanan: ${playerColor === 'w' ? 'Beyaz' : 'Siyah'}`);
-        } else if (room.game.in_draw()) {
-          io.to(socket.roomId).emit('gameOver', 'Oyun Berabere!');
+        sendBoardState(currentRoom);
+
+        if (game.game_over()) {
+          clearInterval(room.timerInterval);
+          let reason = 'Oyun Bitti!';
+          if (game.in_checkmate()) reason = `Şah Mat! Kazanan: ${game.turn() === 'w' ? 'Siyah' : 'Beyaz'}`;
+          else if (game.in_draw()) reason = 'Oyun Berabere!';
+          io.to(currentRoom).emit('gameOver', reason);
+          return;
+        }
+
+        // Bot Hamlesi
+        if (room.isVsAi && game.turn() === 'b' && !game.game_over()) {
+          setTimeout(() => makeAiMove(currentRoom), 600);
         }
       }
     } catch (e) {
-      console.log('Geçersiz hamle');
+      console.error(e);
     }
   });
 
-  socket.on('requestRestart', () => {
-    socket.to(socket.roomId).emit('restartRequested');
-  });
-
-  socket.on('acceptRestart', () => {
-    const room = rooms[socket.roomId];
-    if (!room) return;
-
-    resetRoomState(room);
-    if (Object.keys(room.players).length >= 2) {
-      startRoomTimer(socket.roomId);
-    }
-
-    io.to(socket.roomId).emit('boardState', {
-      fen: room.game.fen(),
-      whiteTime: room.whiteTime,
-      blackTime: room.blackTime,
-      lastMove: null
+  socket.on('sendMessage', (msg) => {
+    if (!currentRoom) return;
+    io.to(currentRoom).emit('chatMessage', {
+      sender: userRole === 'w' ? 'Beyaz' : userRole === 'b' ? 'Siyah' : 'İzleyici',
+      role: userRole,
+      text: msg
     });
-    io.to(socket.roomId).emit('gameStatus', 'Oyun yeniden başlatıldı!');
   });
 
-  socket.on('declineRestart', () => {
-    socket.to(socket.roomId).emit('restartDeclined');
+  socket.on('offerDraw', () => {
+    const room = rooms[currentRoom];
+    if (!room || userRole === 's') return;
+    
+    if (userRole === 'w') room.drawOffers.w = true;
+    if (userRole === 'b') room.drawOffers.b = true;
+
+    if (room.drawOffers.w && room.drawOffers.b) {
+      clearInterval(room.timerInterval);
+      io.to(currentRoom).emit('gameOver', 'Anlaşmalı Beraberlik!');
+    } else {
+      socket.to(currentRoom).emit('drawOffered');
+    }
+  });
+
+  socket.on('acceptDraw', () => {
+    const room = rooms[currentRoom];
+    if (!room) return;
+    clearInterval(room.timerInterval);
+    io.to(currentRoom).emit('gameOver', 'Anlaşmalı Beraberlik!');
   });
 
   socket.on('resign', () => {
-    const room = rooms[socket.roomId];
+    const room = rooms[currentRoom];
+    if (!room || userRole === 's') return;
+    clearInterval(room.timerInterval);
+    const winner = userRole === 'w' ? 'Siyah' : 'Beyaz';
+    io.to(currentRoom).emit('gameOver', `${userRole === 'w' ? 'Beyaz' : 'Siyah'} pes etti. Kazanan: ${winner}`);
+  });
+
+  socket.on('requestRestart', () => {
+    if (currentRoom) socket.to(currentRoom).emit('restartRequested');
+  });
+
+  socket.on('acceptRestart', () => {
+    const room = rooms[currentRoom];
     if (!room) return;
-    const playerColor = room.players[socket.id];
-    if (playerColor) {
-      const winner = playerColor === 'w' ? 'Siyah' : 'Beyaz';
-      io.to(socket.roomId).emit('gameOver', `${playerColor === 'w' ? 'Beyaz' : 'Siyah'} pes etti! Kazanan: ${winner}`);
-    }
+    room.game.reset();
+    room.timers = { w: room.initialTime, b: room.initialTime };
+    room.lastMove = null;
+    room.drawOffers = { w: false, b: false };
+    sendBoardState(currentRoom);
+    startTimer(currentRoom);
+    io.to(currentRoom).emit('gameStatus', 'Oyun yeniden başlatıldı!');
   });
 
   socket.on('disconnect', () => {
-    const room = rooms[socket.roomId];
-    if (room) {
-      delete room.players[socket.id];
-      if (Object.keys(room.players).length === 0) {
-        if (room.timerInterval) clearInterval(room.timerInterval);
-        delete rooms[socket.roomId];
-      } else {
-        io.to(socket.roomId).emit('gameStatus', 'Rakip ayrıldı.');
-      }
+    if (currentRoom && rooms[currentRoom]) {
+      const room = rooms[currentRoom];
+      if (socket.id === room.white) room.white = null;
+      if (socket.id === room.black) room.black = null;
     }
   });
 });
 
+function makeAiMove(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+  const game = room.game;
+  const moves = game.moves({ verbose: true });
+  if (moves.length === 0) return;
+
+  // Basit Bot Yapay Zekası: Taş alma hamlelerine öncelik verir
+  const captureMoves = moves.filter(m => m.captured);
+  const selectedMove = captureMoves.length > 0 
+    ? captureMoves[Math.floor(Math.random() * captureMoves.length)]
+    : moves[Math.floor(Math.random() * moves.length)];
+
+  const move = game.move(selectedMove);
+  if (move) {
+    room.lastMove = move;
+    room.timers.b += room.increment;
+    sendBoardState(roomId);
+
+    if (game.game_over()) {
+      clearInterval(room.timerInterval);
+      let reason = 'Oyun Bitti!';
+      if (game.in_checkmate()) reason = 'Şah Mat! Kazanan: Siyah (BOT)';
+      else if (game.in_draw()) reason = 'Oyun Berabere!';
+      io.to(roomId).emit('gameOver', reason);
+    }
+  }
+}
+
+function startTimer(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.timerInterval) return;
+
+  room.timerInterval = setInterval(() => {
+    const turn = room.game.turn();
+    if (turn === 'w') room.timers.w--;
+    else room.timers.b--;
+
+    io.to(roomId).emit('timerUpdate', {
+      whiteTime: room.timers.w,
+      blackTime: room.timers.b,
+      turn: turn
+    });
+
+    if (room.timers.w <= 0 || room.timers.b <= 0) {
+      clearInterval(room.timerInterval);
+      const winner = room.timers.w <= 0 ? 'Siyah' : 'Beyaz';
+      io.to(roomId).emit('gameOver', `Zaman Bitti! Kazanan: ${winner}`);
+    }
+  }, 1000);
+}
+
+function sendBoardState(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+  io.to(roomId).emit('boardState', {
+    fen: room.game.fen(),
+    pgn: room.game.pgn(),
+    lastMove: room.lastMove,
+    whiteTime: room.timers.w,
+    blackTime: room.timers.b
+  });
+}
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Sunucu ${PORT} portunda çalışıyor...`));
+server.listen(PORT, () => console.log(`Server ${PORT} portunda yayında.`));
