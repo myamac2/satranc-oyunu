@@ -20,8 +20,9 @@ io.on('connection', (socket) => {
     currentRoom = roomId;
 
     if (!rooms[roomId]) {
-      const initialTime = timeConfig ? timeConfig.time * 60 : 600;
-      const increment = timeConfig ? timeConfig.inc : 0;
+      const isUnlimited = !timeConfig || timeConfig.time === 0;
+      const initialTime = isUnlimited ? 0 : timeConfig.time * 60;
+      const increment = isUnlimited ? 0 : timeConfig.inc;
 
       rooms[roomId] = {
         game: new Chess(),
@@ -31,6 +32,7 @@ io.on('connection', (socket) => {
         timers: { w: initialTime, b: initialTime },
         increment: increment,
         initialTime: initialTime,
+        isUnlimited: isUnlimited,
         timerInterval: null,
         lastMove: null,
         isVsAi: !!isVsAi,
@@ -79,8 +81,10 @@ io.on('connection', (socket) => {
       if (move) {
         room.lastMove = move;
         
-        if (move.color === 'w') room.timers.w += room.increment;
-        if (move.color === 'b') room.timers.b += room.increment;
+        if (!room.isUnlimited) {
+          if (move.color === 'w') room.timers.w += room.increment;
+          if (move.color === 'b') room.timers.b += room.increment;
+        }
 
         sendBoardState(currentRoom);
 
@@ -260,7 +264,7 @@ function makeSmartAiMove(roomId) {
   const executedMove = game.move(bestMove);
   if (executedMove) {
     room.lastMove = executedMove;
-    room.timers.b += room.increment;
+    if (!room.isUnlimited) room.timers.b += room.increment;
     sendBoardState(roomId);
 
     const isGameOver = typeof game.isGameOver === 'function' ? game.isGameOver() : game.game_over();
@@ -297,7 +301,7 @@ function evaluateBoard(game, botColor) {
 
 function startTimer(roomId) {
   const room = rooms[roomId];
-  if (!room || room.timerInterval) return;
+  if (!room || room.timerInterval || room.isUnlimited) return;
 
   room.timerInterval = setInterval(() => {
     const turn = room.game.turn();
@@ -307,7 +311,8 @@ function startTimer(roomId) {
     io.to(roomId).emit('timerUpdate', {
       whiteTime: room.timers.w,
       blackTime: room.timers.b,
-      turn: turn
+      turn: turn,
+      isUnlimited: false
     });
 
     if (room.timers.w <= 0 || room.timers.b <= 0) {
@@ -327,6 +332,7 @@ function sendBoardState(roomId) {
     lastMove: room.lastMove,
     whiteTime: room.timers.w,
     blackTime: room.timers.b,
+    isUnlimited: room.isUnlimited,
     isVsAi: room.isVsAi,
     takebacksRemaining: room.takebacksRemaining
   });

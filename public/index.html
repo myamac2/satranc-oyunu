@@ -28,7 +28,7 @@
 
     body {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 100vh; background-color: var(--bg-main); color: var(--text-main); padding: 20px;
+      min-height: 100vh; background-color: var(--bg-main); color: var(--text-main); padding: 15px;
     }
 
     #toast-container {
@@ -73,25 +73,28 @@
     .ai-btn:hover { background: #2a2a32; }
 
     #game-screen {
-      display: none; flex-direction: row; gap: 20px; width: 100%; max-width: 1050px;
+      display: none; flex-direction: row; gap: 24px; width: 100%; max-width: 1000px; justify-content: center; align-items: flex-start;
     }
 
     .board-container {
-      display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; max-width: 460px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; max-width: 580px; width: 100%;
     }
 
     .top-bar {
       display: flex; justify-content: space-between; align-items: center; width: 100%;
-      background: var(--bg-card); border: 1px solid var(--border-color); padding: 10px 16px; border-radius: 12px;
+      background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 12px;
     }
 
-    .timer-container { display: flex; justify-content: space-between; width: 100%; gap: 12px; }
-    .timer-card {
-      flex: 1; display: flex; flex-direction: column; align-items: center;
-      background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px; border-radius: 12px;
+    .player-card {
+      display: flex; justify-content: space-between; align-items: center; width: 100%;
+      background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 14px; border-radius: 12px; min-height: 48px;
     }
-    .timer-card.active { border-color: var(--accent-green); }
-    .timer { font-size: 1.3rem; font-weight: 700; font-family: monospace; }
+    .player-card.active { border-color: var(--accent-green); }
+
+    .captured-pieces { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+    .captured-pieces img { width: 22px; height: 22px; }
+
+    .timer { font-size: 1.2rem; font-weight: 700; font-family: monospace; }
 
     #board { width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
 
@@ -112,7 +115,7 @@
     }
 
     .right-panel {
-      width: 320px; display: flex; flex-direction: column; gap: 12px; height: 580px;
+      width: 320px; display: flex; flex-direction: column; gap: 12px; height: 700px;
     }
 
     .panel-box {
@@ -137,7 +140,7 @@
     .emoji-row { display: flex; gap: 6px; padding: 4px 8px; background: #121216; overflow-x: auto; }
     .emoji-btn { background: none; border: none; font-size: 1.1rem; cursor: pointer; }
 
-    .control-buttons { display: flex; gap: 6px; width: 100%; flex-wrap: wrap; }
+    .control-buttons { display: flex; gap: 6px; width: 100%; flex-wrap: wrap; margin-top: 4px; }
     .btn {
       flex: 1; min-width: 70px; padding: 10px 6px; border: 1px solid var(--border-color); border-radius: 10px;
       font-weight: 600; cursor: pointer; background: var(--bg-card); color: var(--text-main); font-size: 0.78rem; text-align: center;
@@ -158,9 +161,9 @@
     .promotion-pieces img { width: 48px; height: 48px; cursor: pointer; background: #1a1a22; border-radius: 8px; padding: 4px; }
     .promotion-pieces img:hover { background: var(--accent-blue); }
 
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       #game-screen { flex-direction: column; align-items: center; }
-      .right-panel { width: 100%; max-width: 460px; height: 400px; }
+      .right-panel { width: 100%; max-width: 580px; height: 400px; }
     }
   </style>
 </head>
@@ -177,6 +180,7 @@
     <div class="input-group">
       <label>Zaman Kontrolü</label>
       <select id="time-select">
+        <option value="0|0">♾️ Süresiz (Zamansız)</option>
         <option value="1|0">Bullet (1 Dakika)</option>
         <option value="3|2">Blitz (3 Dk + 2 Sn)</option>
         <option value="5|3">Blitz (5 Dk + 3 Sn)</option>
@@ -197,19 +201,25 @@
         </div>
       </div>
 
-      <div class="timer-container">
-        <div id="black-timer-card" class="timer-card">
-          <span style="font-size:0.7rem; color:var(--text-muted);">Siyah</span>
-          <span id="black-timer" class="timer">10:00</span>
+      <!-- Rakip Paneli (Üst) -->
+      <div id="top-player-card" class="player-card">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="top-player-name" style="font-size:0.85rem; font-weight:700;">Rakip</span>
+          <div id="top-captured" class="captured-pieces"></div>
         </div>
-        <div id="white-timer-card" class="timer-card">
-          <span style="font-size:0.7rem; color:var(--text-muted);">Beyaz</span>
-          <span id="white-timer" class="timer">10:00</span>
-        </div>
+        <span id="top-timer" class="timer">--:--</span>
       </div>
 
-      <div id="status" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); text-align:center;">Oyun Hazır</div>
       <div id="board"></div>
+
+      <!-- Oyuncu Paneli (Alt) -->
+      <div id="bottom-player-card" class="player-card">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="bottom-player-name" style="font-size:0.85rem; font-weight:700;">Siz</span>
+          <div id="bottom-captured" class="captured-pieces"></div>
+        </div>
+        <span id="bottom-timer" class="timer">--:--</span>
+      </div>
 
       <div class="control-buttons">
         <button id="takeback-btn" class="btn" onclick="takebackMove()" style="display:none;">Geri Al (3)</button>
@@ -265,7 +275,7 @@
     const socket = io();
     let game = new Chess();
     let board = null;
-    let myRole = null;
+    let myRole = 'w';
     let currentRoomId = '';
     let selectedSquare = null;
     let pendingMove = null;
@@ -320,7 +330,7 @@
     }
 
     function goToMainMenu() {
-      if (confirm('Ana menüye dönmek istediğinizden emin misiniz? Devam eden maçtan ayrılacaksınız.')) {
+      if (confirm('Ana menüye dönmek istediğinizden emin misiniz?')) {
         socket.emit('leaveRoom');
         game.reset();
         previousFen = '';
@@ -386,9 +396,7 @@
       resetSelection();
     }
 
-    function takebackMove() {
-      socket.emit('takeback');
-    }
+    function takebackMove() { socket.emit('takeback'); }
 
     function openPromotionModal() {
       const color = game.turn();
@@ -447,6 +455,44 @@
       }
     }
 
+    function updateCapturedPieces() {
+      const initialCounts = { p: 8, r: 2, n: 2, b: 2, q: 1 };
+      const currentCounts = { w: { p: 0, r: 0, n: 0, b: 0, q: 0 }, b: { p: 0, r: 0, n: 0, b: 0, q: 0 } };
+
+      const boardState = game.board();
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const p = boardState[r][c];
+          if (p && p.type !== 'k') {
+            currentCounts[p.color][p.type]++;
+          }
+        }
+      }
+
+      const capturedW = []; // Beyazın kaybettiği taşlar
+      const capturedB = []; // Siyahın kaybettiği taşlar
+
+      ['p', 'n', 'b', 'r', 'q'].forEach(type => {
+        const missingW = initialCounts[type] - currentCounts['w'][type];
+        for (let i = 0; i < missingW; i++) capturedW.push('w' + type.toUpperCase());
+
+        const missingB = initialCounts[type] - currentCounts['b'][type];
+        for (let i = 0; i < missingB; i++) capturedB.push('b' + type.toUpperCase());
+      });
+
+      // Görünüm oryantasyonuna göre yenen taşları dağıt
+      const topCapturedContainer = document.getElementById('top-captured');
+      const bottomCapturedContainer = document.getElementById('bottom-captured');
+
+      if (myRole === 'b') {
+        topCapturedContainer.innerHTML = capturedB.map(p => `<img src="${pieceTheme(p)}">`).join('');
+        bottomCapturedContainer.innerHTML = capturedW.map(p => `<img src="${pieceTheme(p)}">`).join('');
+      } else {
+        topCapturedContainer.innerHTML = capturedW.map(p => `<img src="${pieceTheme(p)}">`).join('');
+        bottomCapturedContainer.innerHTML = capturedB.map(p => `<img src="${pieceTheme(p)}">`).join('');
+      }
+    }
+
     function sendMessage() {
       const input = document.getElementById('chat-input');
       if (input.value.trim()) {
@@ -455,9 +501,7 @@
       }
     }
 
-    function sendEmoji(emoji) {
-      socket.emit('sendMessage', emoji);
-    }
+    function sendEmoji(emoji) { socket.emit('sendMessage', emoji); }
 
     socket.on('chatMessage', (data) => {
       const list = document.getElementById('chat-messages');
@@ -465,9 +509,7 @@
       list.scrollTop = list.scrollHeight;
     });
 
-    socket.on('toast', (data) => {
-      showToast(data.msg, data.type);
-    });
+    socket.on('toast', (data) => { showToast(data.msg, data.type); });
 
     socket.on('boardState', (data) => {
       const isNewBoard = data.fen !== previousFen;
@@ -478,9 +520,10 @@
         board.position(data.fen, true);
       }
 
-      updateTimers(data.whiteTime, data.blackTime, game.turn());
+      updateTimers(data.whiteTime, data.blackTime, game.turn(), data.isUnlimited);
       updateHistory();
       highlightLastMoveAndCheck(data.lastMove);
+      updateCapturedPieces();
 
       if (data.isVsAi) {
         const $btn = $('#takeback-btn');
@@ -502,11 +545,13 @@
 
     socket.on('playerRole', (role) => {
       myRole = role;
+      document.getElementById('bottom-player-name').innerText = role === 'b' ? 'Siyah (Siz)' : 'Beyaz (Siz)';
+      document.getElementById('top-player-name').innerText = role === 'b' ? 'Beyaz (Rakip)' : 'Siyah (Rakip)';
       if (board) board.orientation(role === 'b' ? 'black' : 'white');
     });
 
     socket.on('timerUpdate', (data) => {
-      updateTimers(data.whiteTime, data.blackTime, data.turn);
+      updateTimers(data.whiteTime, data.blackTime, data.turn, data.isUnlimited);
     });
 
     socket.on('gameOver', (msg) => { showToast(msg, 'warning'); });
@@ -523,11 +568,28 @@
     function copyPGN() { navigator.clipboard.writeText(currentPGN); showToast('PGN Kopyalandı!', 'success'); }
     function copyFEN() { navigator.clipboard.writeText(game.fen()); showToast('FEN Kopyalandı!', 'success'); }
 
-    function updateTimers(wTime, bTime, turn) {
-      document.getElementById('white-timer').innerText = formatTime(wTime);
-      document.getElementById('black-timer').innerText = formatTime(bTime);
-      document.getElementById('white-timer-card').classList.toggle('active', turn === 'w');
-      document.getElementById('black-timer-card').classList.toggle('active', turn === 'b');
+    function updateTimers(wTime, bTime, turn, isUnlimited) {
+      const topTimer = document.getElementById('top-timer');
+      const bottomTimer = document.getElementById('bottom-timer');
+      const topCard = document.getElementById('top-player-card');
+      const bottomCard = document.getElementById('bottom-player-card');
+
+      if (isUnlimited) {
+        topTimer.innerText = '♾️';
+        bottomTimer.innerText = '♾️';
+      } else {
+        if (myRole === 'b') {
+          topTimer.innerText = formatTime(wTime);
+          bottomTimer.innerText = formatTime(bTime);
+        } else {
+          topTimer.innerText = formatTime(bTime);
+          bottomTimer.innerText = formatTime(wTime);
+        }
+      }
+
+      const isMyTurn = (turn === 'w' && myRole === 'w') || (turn === 'b' && myRole === 'b');
+      bottomCard.classList.toggle('active', isMyTurn);
+      topCard.classList.toggle('active', !isMyTurn);
     }
 
     function formatTime(s) {
