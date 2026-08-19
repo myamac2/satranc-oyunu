@@ -19,6 +19,7 @@
       --accent-green: #22c55e;
       --accent-red: #ef4444;
       --accent-orange: #f97316;
+      --accent-blue: #3b82f6;
       --text-main: #f3f4f6;
       --text-muted: #71717a;
     }
@@ -40,6 +41,48 @@
       color: var(--text-main);
       padding: 20px;
     }
+
+    /* TOAST BİLDİRİM SİSTEMİ */
+    #toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(14, 14, 17, 0.92);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      transform: translateX(40px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: auto;
+      max-width: 340px;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .toast.info { border-left: 4px solid var(--accent-blue); }
+    .toast.success { border-left: 4px solid var(--accent-green); }
+    .toast.warning { border-left: 4px solid var(--accent-orange); }
+    .toast.error { border-left: 4px solid var(--accent-red); }
 
     #lobby-screen {
       display: flex;
@@ -145,6 +188,11 @@
       border-radius: 6px;
       cursor: pointer;
       font-size: 0.75rem;
+      transition: background 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: #2a2a32;
     }
 
     .timer-container {
@@ -334,6 +382,11 @@
       cursor: pointer;
       background: var(--bg-card);
       color: var(--text-main);
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
     }
 
     .modal-overlay {
@@ -397,10 +450,21 @@
         max-width: 440px;
         height: 200px;
       }
+      #toast-container {
+        top: 12px;
+        right: 12px;
+        left: 12px;
+      }
+      .toast {
+        max-width: 100%;
+      }
     }
   </style>
 </head>
 <body>
+
+  <!-- Toast Bildirim Kabı -->
+  <div id="toast-container"></div>
 
   <div id="lobby-screen">
     <h2>STUDIO CHESS</h2>
@@ -478,6 +542,22 @@
 
     const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
     const startingPieces = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
+
+    // MODERN TOAST BİLDİRİM FONKSİYONU
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerText = message;
+      container.appendChild(toast);
+
+      setTimeout(() => toast.classList.add('show'), 10);
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
 
     function pieceTheme(piece) {
       return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/alpha/' + piece + '.svg';
@@ -560,7 +640,7 @@
     function copyInviteLink() {
       const inviteUrl = window.location.origin + '?room=' + currentRoomId;
       navigator.clipboard.writeText(inviteUrl).then(() => {
-        alert('Davet linki kopyalandı:\n' + inviteUrl);
+        showToast('Davet linki panoya kopyalandı!', 'success');
       });
     }
 
@@ -573,7 +653,7 @@
 
     function restartGame() {
       if (myRole === 's') return;
-      alert('Yeniden başlatma isteği rakibinize gönderildi.');
+      showToast('Yeniden başlatma isteği rakibe iletildi.', 'info');
       socket.emit('requestRestart');
     }
 
@@ -591,7 +671,7 @@
     });
 
     socket.on('restartDeclined', () => {
-      alert('Rakibiniz yeniden başlatma isteğini reddetti.');
+      showToast('Rakibiniz yeniden başlatma isteğini reddetti.', 'warning');
     });
 
     socket.on('playerRole', (role) => {
@@ -607,6 +687,11 @@
 
     socket.on('gameStatus', (msg) => {
       document.getElementById('status').innerText = msg;
+      if (msg === 'Oyun Başladı!') {
+        showToast('Rakip bağlandı, oyun başladı!', 'success');
+      } else if (msg === 'Oyun yeniden başlatıldı!') {
+        showToast('Tahta sıfırlandı, yeni oyun başladı!', 'success');
+      }
     });
 
     socket.on('boardState', (data) => {
@@ -639,7 +724,7 @@
     });
 
     socket.on('gameOver', (msg) => {
-      alert(msg);
+      showToast(msg, 'error');
       document.getElementById('status').innerText = msg;
     });
 
