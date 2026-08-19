@@ -43,6 +43,7 @@ io.on('connection', (socket) => {
         timerInterval: null,
         lastMove: null,
         isVsAi: !!isVsAi,
+        takebacksRemaining: 3,
         drawOffers: { w: false, b: false }
       };
     }
@@ -117,6 +118,41 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Bot için Hamle Geri Alma Event'i
+  socket.on('takeback', () => {
+    const room = rooms[currentRoom];
+    if (!room || !room.isVsAi || userRole !== 'w') return;
+
+    if (room.takebacksRemaining <= 0) {
+      socket.emit('toast', { msg: 'Geri alma hakkınız kalmadı! (Max 3)', type: 'error' });
+      return;
+    }
+
+    const history = room.game.history({ verbose: true });
+    if (history.length === 0) {
+      socket.emit('toast', { msg: 'Geri alınacak hamle yok!', type: 'warning' });
+      return;
+    }
+
+    // Bot maçında hamle geri alma: Sıra Beyazdaysa hem botun hem oyuncunun hamlesini geri al
+    if (room.game.turn() === 'w' && history.length >= 2) {
+      room.game.undo(); // Bot hamlesini geri al
+      room.game.undo(); // Oyuncu hamlesini geri al
+    } else if (room.game.turn() === 'b' && history.length >= 1) {
+      room.game.undo(); // Sadece oyuncunun hamlesini geri al
+    } else if (history.length === 1) {
+      room.game.undo();
+    }
+
+    room.takebacksRemaining--;
+
+    const newHistory = room.game.history({ verbose: true });
+    room.lastMove = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null;
+
+    sendBoardState(currentRoom);
+    socket.emit('toast', { msg: `Hamle geri alındı. Kalan hak: ${room.takebacksRemaining}`, type: 'info' });
+  });
+
   socket.on('sendMessage', (msg) => {
     if (!currentRoom) return;
     io.to(currentRoom).emit('chatMessage', {
@@ -166,6 +202,7 @@ io.on('connection', (socket) => {
     room.game.reset();
     room.timers = { w: room.initialTime, b: room.initialTime };
     room.lastMove = null;
+    room.takebacksRemaining = 3;
     room.drawOffers = { w: false, b: false };
     sendBoardState(currentRoom);
     startTimer(currentRoom);
@@ -188,11 +225,15 @@ io.on('connection', (socket) => {
   });
 });
 
-// Akıllı Yapay Zeka (Minimax Değerlendirmeli)
+// Akıllı Yapay Zeka
 function makeSmartAiMove(roomId) {
   const room = rooms[roomId];
   if (!room) return;
   const game = room.game;
+  
+  // Eğer oyuncu bot hamle yapmadan hemen önce hamleyi geri aldıysa çalışma
+  if (game.turn() !== 'b') return;
+
   const moves = game.moves({ verbose: true });
   if (moves.length === 0) return;
 
@@ -203,10 +244,8 @@ function makeSmartAiMove(roomId) {
     const move = moves[i];
     game.move(move);
 
-    // Tahta durumunu değerlendir
     let boardValue = evaluateBoard(game, 'b');
 
-    // Eğer hamle mat ediyorsa doğrudan seç
     const isCheckmate = typeof game.isCheckmate === 'function' ? game.isCheckmate() : game.in_checkmate();
     if (isCheckmate) boardValue += 10000;
 
@@ -218,7 +257,6 @@ function makeSmartAiMove(roomId) {
     }
   }
 
-  // Değerler eşitse rastgelelik kat
   if (!bestMove) {
     bestMove = moves[Math.floor(Math.random() * moves.length)];
   }
@@ -295,7 +333,9 @@ function sendBoardState(roomId) {
     pgn: room.game.pgn(),
     lastMove: room.lastMove,
     whiteTime: room.timers.w,
-    blackTime: room.timers.b
+    blackTime: room.timers.b,
+    isVsAi: room.isVsAi,
+    takebacksRemaining: room.takebacksRemaining
   });
 }
 

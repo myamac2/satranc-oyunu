@@ -98,7 +98,6 @@
     .white-1e1d3 { background-color: #3d414a !important; color: #71717a !important; }
     .black-3c85d { background-color: #212328 !important; color: #4b4d54 !important; }
 
-    /* VURGU VE ŞAH EFEKTLERİ */
     .highlight-move { box-shadow: inset 0 0 0 1000px rgba(234, 179, 8, 0.35) !important; }
     .selected-square { background-color: rgba(59, 130, 246, 0.5) !important; }
     .check-square { background: radial-gradient(circle, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.7) 60%, rgba(185, 28, 28, 0) 90%) !important; }
@@ -213,6 +212,7 @@
       <div id="board"></div>
 
       <div class="control-buttons">
+        <button id="takeback-btn" class="btn" onclick="takebackMove()" style="display:none;">Geri Al (3)</button>
         <button class="btn" onclick="offerDraw()">Beraberlik</button>
         <button class="btn" onclick="resignGame()">Pes Et</button>
         <button class="btn" onclick="restartGame()">Sıfırla</button>
@@ -258,7 +258,6 @@
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"></script>
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
 
@@ -354,6 +353,10 @@
       resetSelection();
     }
 
+    function takebackMove() {
+      socket.emit('takeback');
+    }
+
     function openPromotionModal() {
       const color = game.turn();
       document.getElementById('prom-q').src = pieceTheme(color + 'Q');
@@ -429,6 +432,10 @@
       list.scrollTop = list.scrollHeight;
     });
 
+    socket.on('toast', (data) => {
+      showToast(data.msg, data.type);
+    });
+
     socket.on('boardState', (data) => {
       const fenChanged = data.fen !== game.fen();
       game.load(data.fen);
@@ -438,6 +445,19 @@
       updateTimers(data.whiteTime, data.blackTime, game.turn());
       updateHistory();
       highlightLastMoveAndCheck(data.lastMove);
+
+      // Bot maçlarında Geri Al butonunu göster ve kalan hak ile güncelle
+      if (data.isVsAi) {
+        const $btn = $('#takeback-btn');
+        $btn.show().text(`Geri Al (${data.takebacksRemaining})`);
+        if (data.takebacksRemaining <= 0) {
+          $btn.prop('disabled', true).css('opacity', '0.5');
+        } else {
+          $btn.prop('disabled', false).css('opacity', '1');
+        }
+      } else {
+        $('#takeback-btn').hide();
+      }
 
       if (fenChanged && data.lastMove) {
         const inCheck = typeof game.in_check === 'function' ? game.in_check() : game.inCheck();
