@@ -270,6 +270,7 @@
     let selectedSquare = null;
     let pendingMove = null;
     let currentPGN = '';
+    let lastPlayedFen = '';
 
     const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
     const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
@@ -277,6 +278,18 @@
 
     function pieceTheme(piece) {
       return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/maestro/' + piece + '.svg';
+    }
+
+    function playMoveAudio(moveObj) {
+      if (!moveObj) return;
+      const inCheck = typeof game.in_check === 'function' ? game.in_check() : game.inCheck();
+      if (inCheck) {
+        checkSound.play().catch(()=>{});
+      } else if (moveObj.captured) {
+        captureSound.play().catch(()=>{});
+      } else {
+        moveSound.play().catch(()=>{});
+      }
     }
 
     function showToast(msg, type = 'info') {
@@ -309,8 +322,6 @@
     function goToMainMenu() {
       if (confirm('Ana menüye dönmek istediğinizden emin misiniz? Devam eden maçtan ayrılacaksınız.')) {
         socket.emit('leaveRoom');
-        
-        // Ekranı temizle ve sıfırla
         game.reset();
         if (board) {
           board.destroy();
@@ -367,6 +378,8 @@
     function executeMove(from, to, promotion) {
       const move = game.move({ from, to, promotion });
       if (move) {
+        lastPlayedFen = game.fen();
+        playMoveAudio(move);
         socket.emit('move', { from, to, promotion });
         board.position(game.fen());
       }
@@ -457,7 +470,7 @@
     });
 
     socket.on('boardState', (data) => {
-      const fenChanged = data.fen !== game.fen();
+      const isNewFen = data.fen !== lastPlayedFen;
       game.load(data.fen);
       currentPGN = data.pgn;
       if (board) board.position(data.fen, true);
@@ -478,12 +491,10 @@
         $('#takeback-btn').hide();
       }
 
-      if (fenChanged && data.lastMove) {
-        const inCheck = typeof game.in_check === 'function' ? game.in_check() : game.inCheck();
-        if (inCheck) checkSound.play().catch(()=>{});
-        else if (data.lastMove.captured) captureSound.play().catch(()=>{});
-        else moveSound.play().catch(()=>{});
+      if (isNewFen && data.lastMove) {
+        playMoveAudio(data.lastMove);
       }
+      lastPlayedFen = data.fen;
     });
 
     socket.on('playerRole', (role) => {
