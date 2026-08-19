@@ -10,7 +10,6 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 const rooms = {};
-
 const pieceValues = { p: 10, n: 30, b: 30, r: 50, q: 90, k: 900 };
 
 io.on('connection', (socket) => {
@@ -101,7 +100,7 @@ io.on('connection', (socket) => {
         }
 
         if (room.isVsAi && game.turn() === 'b' && !isGameOver) {
-          setTimeout(() => makeSmartAiMove(currentRoom), 500);
+          setTimeout(() => makeSmartAiMove(currentRoom), 300);
         }
       }
     } catch (e) {
@@ -198,7 +197,6 @@ io.on('connection', (socket) => {
     io.to(currentRoom).emit('gameStatus', 'Oyun yeniden başlatıldı!');
   });
 
-  // Odadan ayrılma (Ana Menüye Dönüş)
   socket.on('leaveRoom', () => {
     cleanUpUserFromRoom(socket, currentRoom);
     currentRoom = null;
@@ -244,7 +242,6 @@ function makeSmartAiMove(roomId) {
     game.move(move);
 
     let boardValue = evaluateBoard(game, 'b');
-
     const isCheckmate = typeof game.isCheckmate === 'function' ? game.isCheckmate() : game.in_checkmate();
     if (isCheckmate) boardValue += 10000;
 
@@ -290,11 +287,8 @@ function evaluateBoard(game, botColor) {
       const piece = board[row][col];
       if (piece) {
         const val = pieceValues[piece.type] || 0;
-        if (piece.color === botColor) {
-          totalEvaluation += val;
-        } else {
-          totalEvaluation -= val;
-        }
+        if (piece.color === botColor) totalEvaluation += val;
+        else totalEvaluation -= val;
       }
     }
   }

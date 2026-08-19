@@ -208,7 +208,7 @@
         </div>
       </div>
 
-      <div id="status" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); text-align:center;">Bağlanıyor...</div>
+      <div id="status" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); text-align:center;">Oyun Hazır</div>
       <div id="board"></div>
 
       <div class="control-buttons">
@@ -270,7 +270,7 @@
     let selectedSquare = null;
     let pendingMove = null;
     let currentPGN = '';
-    let lastPlayedFen = '';
+    let previousFen = '';
 
     const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
     const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
@@ -323,6 +323,7 @@
       if (confirm('Ana menüye dönmek istediğinizden emin misiniz? Devam eden maçtan ayrılacaksınız.')) {
         socket.emit('leaveRoom');
         game.reset();
+        previousFen = '';
         if (board) {
           board.destroy();
           board = null;
@@ -378,7 +379,6 @@
     function executeMove(from, to, promotion) {
       const move = game.move({ from, to, promotion });
       if (move) {
-        lastPlayedFen = game.fen();
         playMoveAudio(move);
         socket.emit('move', { from, to, promotion });
         board.position(game.fen());
@@ -470,10 +470,13 @@
     });
 
     socket.on('boardState', (data) => {
-      const isNewFen = data.fen !== lastPlayedFen;
+      const isNewBoard = data.fen !== previousFen;
       game.load(data.fen);
       currentPGN = data.pgn;
-      if (board) board.position(data.fen, true);
+      
+      if (board) {
+        board.position(data.fen, true);
+      }
 
       updateTimers(data.whiteTime, data.blackTime, game.turn());
       updateHistory();
@@ -491,10 +494,10 @@
         $('#takeback-btn').hide();
       }
 
-      if (isNewFen && data.lastMove) {
+      if (isNewBoard && data.lastMove) {
         playMoveAudio(data.lastMove);
       }
-      lastPlayedFen = data.fen;
+      previousFen = data.fen;
     });
 
     socket.on('playerRole', (role) => {
