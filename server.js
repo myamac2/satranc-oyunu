@@ -11,7 +11,6 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// Tüm odaları tutan nesne
 const rooms = {};
 
 function createRoomState() {
@@ -61,7 +60,6 @@ function startTimer(roomId) {
 io.on('connection', (socket) => {
   let currentRoomId = null;
 
-  // Oyuncu bir odaya katıldığında
   socket.on('joinRoom', (roomId) => {
     currentRoomId = roomId;
     socket.join(roomId);
@@ -83,10 +81,13 @@ io.on('connection', (socket) => {
       socket.emit('spectatorRole');
     }
 
-    socket.emit('boardState', { fen: room.game.fen(), whiteTime: room.whiteTime, blackTime: room.blackTime });
+    socket.emit('boardState', { 
+      fen: room.game.fen(), 
+      whiteTime: room.whiteTime, 
+      blackTime: room.blackTime 
+    });
   });
 
-  // Hamle yapıldığında
   socket.on('move', (moveData) => {
     if (!currentRoomId || !rooms[currentRoomId]) return;
     const room = rooms[currentRoomId];
@@ -101,7 +102,13 @@ io.on('connection', (socket) => {
     try {
       const result = room.game.move(moveData);
       if (result) {
-        io.to(currentRoomId).emit('boardState', { fen: room.game.fen(), whiteTime: room.whiteTime, blackTime: room.blackTime });
+        // Hamle detayını (lastMove) istemcilere gönderiyoruz
+        io.to(currentRoomId).emit('boardState', { 
+          fen: room.game.fen(), 
+          whiteTime: room.whiteTime, 
+          blackTime: room.blackTime,
+          lastMove: result
+        });
       } else {
         socket.emit('boardState', { fen: room.game.fen(), whiteTime: room.whiteTime, blackTime: room.blackTime });
       }
@@ -110,7 +117,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Bağlantı koptuğunda
   socket.on('disconnect', () => {
     if (!currentRoomId || !rooms[currentRoomId]) return;
     const room = rooms[currentRoomId];

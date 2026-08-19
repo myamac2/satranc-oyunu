@@ -120,7 +120,20 @@
     let selectedTheme = 'classic';
     let currentRoomId = '';
 
-    // URL'deki oda parametresini kontrol et
+    // Ses efekti dosyaları
+    const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
+    const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
+
+    function playSound(isCapture) {
+      if (isCapture) {
+        captureSound.currentTime = 0;
+        captureSound.play().catch(() => {});
+      } else {
+        moveSound.currentTime = 0;
+        moveSound.play().catch(() => {});
+      }
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
@@ -173,10 +186,16 @@
     });
 
     socket.on('boardState', (data) => {
+      const fenChanged = data.fen !== game.fen();
       game.load(data.fen);
       if (board) board.position(data.fen, true);
       updateStatus();
       updateTimers(data.whiteTime, data.blackTime, game.turn());
+
+      // Hamle yapıldıysa ses çal
+      if (fenChanged && data.lastMove) {
+        playSound(!!data.lastMove.captured);
+      }
     });
 
     socket.on('timerUpdate', (data) => {
