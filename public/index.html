@@ -234,7 +234,8 @@
           </select>
           <select id="piece-theme-select" onchange="changePieceTheme(this.value)">
             <option value="maestro">🎨 Maestro Seti</option>
-            <option value="neo">✨ Neo Modern</option>
+            <option value="alpha">✨ Alpha Modern</option>
+            <option value="letter">🔤 Letter (Minimal)</option>
             <option value="staunty">♟️ Klasik Staunton</option>
           </select>
         </div>
@@ -332,6 +333,9 @@
     const checkSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Check.mp3');
 
     function pieceTheme(piece) {
+      if (currentPieceSet === 'letter') {
+        return `https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/letter/${piece.toLowerCase()}.svg`;
+      }
       return `https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/${currentPieceSet}/${piece}.svg`;
     }
 
