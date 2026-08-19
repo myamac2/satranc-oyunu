@@ -11,6 +11,16 @@ app.use(express.static('public'));
 
 const rooms = {};
 
+// Taş değerleri (Bot değerlendirme algoritması için)
+const pieceValues = {
+  p: 10,
+  n: 30,
+  b: 30,
+  r: 50,
+  q: 90,
+  k: 900
+};
+
 io.on('connection', (socket) => {
   let currentRoom = null;
   let userRole = null;
@@ -77,24 +87,29 @@ io.on('connection', (socket) => {
       if (move) {
         room.lastMove = move;
         
-        // Increment ekle
         if (move.color === 'w') room.timers.w += room.increment;
         if (move.color === 'b') room.timers.b += room.increment;
 
         sendBoardState(currentRoom);
 
-        if (game.game_over()) {
+        const isGameOver = typeof game.isGameOver === 'function' ? game.isGameOver() : game.game_over();
+        
+        if (isGameOver) {
           clearInterval(room.timerInterval);
           let reason = 'Oyun Bitti!';
-          if (game.in_checkmate()) reason = `Şah Mat! Kazanan: ${game.turn() === 'w' ? 'Siyah' : 'Beyaz'}`;
-          else if (game.in_draw()) reason = 'Oyun Berabere!';
+          const isCheckmate = typeof game.isCheckmate === 'function' ? game.isCheckmate() : game.in_checkmate();
+          const isDraw = typeof game.isDraw === 'function' ? game.isDraw() : game.in_draw();
+
+          if (isCheckmate) reason = `Şah Mat! Kazanan: ${game.turn() === 'w' ? 'Siyah' : 'Beyaz'}`;
+          else if (isDraw) reason = 'Oyun Berabere!';
+          
           io.to(currentRoom).emit('gameOver', reason);
           return;
         }
 
-        // Bot Hamlesi
-        if (room.isVsAi && game.turn() === 'b' && !game.game_over()) {
-          setTimeout(() => makeAiMove(currentRoom), 600);
+        // Akıllı Bot Hamlesi
+        if (room.isVsAi && game.turn() === 'b' && !isGameOver) {
+          setTimeout(() => makeSmartAiMove(currentRoom), 500);
         }
       }
     } catch (e) {
@@ -162,37 +177,91 @@ io.on('connection', (socket) => {
       const room = rooms[currentRoom];
       if (socket.id === room.white) room.white = null;
       if (socket.id === room.black) room.black = null;
+      
+      room.spectators = room.spectators.filter(id => id !== socket.id);
+
+      if (!room.white && !room.black && room.spectators.length === 0) {
+        clearInterval(room.timerInterval);
+        delete rooms[currentRoom];
+      }
     }
   });
 });
 
-function makeAiMove(roomId) {
+// Akıllı Yapay Zeka (Minimax Değerlendirmeli)
+function makeSmartAiMove(roomId) {
   const room = rooms[roomId];
   if (!room) return;
   const game = room.game;
   const moves = game.moves({ verbose: true });
   if (moves.length === 0) return;
 
-  // Basit Bot Yapay Zekası: Taş alma hamlelerine öncelik verir
-  const captureMoves = moves.filter(m => m.captured);
-  const selectedMove = captureMoves.length > 0 
-    ? captureMoves[Math.floor(Math.random() * captureMoves.length)]
-    : moves[Math.floor(Math.random() * moves.length)];
+  let bestMove = null;
+  let bestValue = -9999;
 
-  const move = game.move(selectedMove);
-  if (move) {
-    room.lastMove = move;
+  for (let i = 0; i < moves.length; i++) {
+    const move = moves[i];
+    game.move(move);
+
+    // Tahta durumunu değerlendir
+    let boardValue = evaluateBoard(game, 'b');
+
+    // Eğer hamle mat ediyorsa doğrudan seç
+    const isCheckmate = typeof game.isCheckmate === 'function' ? game.isCheckmate() : game.in_checkmate();
+    if (isCheckmate) boardValue += 10000;
+
+    game.undo();
+
+    if (boardValue > bestValue) {
+      bestValue = boardValue;
+      bestMove = move;
+    }
+  }
+
+  // Değerler eşitse rastgelelik kat
+  if (!bestMove) {
+    bestMove = moves[Math.floor(Math.random() * moves.length)];
+  }
+
+  const executedMove = game.move(bestMove);
+  if (executedMove) {
+    room.lastMove = executedMove;
     room.timers.b += room.increment;
     sendBoardState(roomId);
 
-    if (game.game_over()) {
+    const isGameOver = typeof game.isGameOver === 'function' ? game.isGameOver() : game.game_over();
+    if (isGameOver) {
       clearInterval(room.timerInterval);
       let reason = 'Oyun Bitti!';
-      if (game.in_checkmate()) reason = 'Şah Mat! Kazanan: Siyah (BOT)';
-      else if (game.in_draw()) reason = 'Oyun Berabere!';
+      const isCheckmate = typeof game.isCheckmate === 'function' ? game.isCheckmate() : game.in_checkmate();
+      const isDraw = typeof game.isDraw === 'function' ? game.isDraw() : game.in_draw();
+
+      if (isCheckmate) reason = 'Şah Mat! Kazanan: Siyah (BOT)';
+      else if (isDraw) reason = 'Oyun Berabere!';
+      
       io.to(roomId).emit('gameOver', reason);
     }
   }
+}
+
+function evaluateBoard(game, botColor) {
+  let totalEvaluation = 0;
+  const board = game.board();
+
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = board[row][col];
+      if (piece) {
+        const val = pieceValues[piece.type] || 0;
+        if (piece.color === botColor) {
+          totalEvaluation += val;
+        } else {
+          totalEvaluation -= val;
+        }
+      }
+    }
+  }
+  return totalEvaluation;
 }
 
 function startTimer(roomId) {

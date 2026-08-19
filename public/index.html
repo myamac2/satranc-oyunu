@@ -97,17 +97,19 @@
 
     .white-1e1d3 { background-color: #3d414a !important; color: #71717a !important; }
     .black-3c85d { background-color: #212328 !important; color: #4b4d54 !important; }
-    .highlight-move { box-shadow: inset 0 0 0 1000px rgba(255, 215, 0, 0.28) !important; }
-    .selected-square { background-color: rgba(59, 130, 246, 0.4) !important; }
-    .check-square { background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, rgba(220, 38, 38, 0.6) 50%, rgba(185, 28, 28, 0) 85%) !important; }
+
+    /* VURGU VE ŞAH EFEKTLERİ */
+    .highlight-move { box-shadow: inset 0 0 0 1000px rgba(234, 179, 8, 0.35) !important; }
+    .selected-square { background-color: rgba(59, 130, 246, 0.5) !important; }
+    .check-square { background: radial-gradient(circle, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.7) 60%, rgba(185, 28, 28, 0) 90%) !important; }
 
     .legal-dot::after {
       content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 26%; height: 26%; background-color: rgba(34, 197, 94, 0.7); border-radius: 50%; pointer-events: none;
+      width: 26%; height: 26%; background-color: rgba(34, 197, 94, 0.75); border-radius: 50%; pointer-events: none;
     }
     .legal-capture::after {
       content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      border: 5px solid rgba(34, 197, 94, 0.7); border-radius: 50%; pointer-events: none;
+      border: 5px solid rgba(34, 197, 94, 0.75); border-radius: 50%; pointer-events: none;
     }
 
     .right-panel {
@@ -256,6 +258,7 @@
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"></script>
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
 
@@ -271,6 +274,7 @@
 
     const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
     const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
+    const checkSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Check.mp3');
 
     function pieceTheme(piece) {
       return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/maestro/' + piece + '.svg';
@@ -304,7 +308,8 @@
     }
 
     function handleSquareClick(square) {
-      if (game.game_over() || myRole === 's') return;
+      const isGameOver = typeof game.isGameOver === 'function' ? game.isGameOver() : game.game_over();
+      if (isGameOver || myRole === 's') return;
       if ((game.turn() === 'w' && myRole !== 'w') || (game.turn() === 'b' && myRole !== 'b')) return;
 
       const piece = game.get(square);
@@ -323,7 +328,6 @@
         return;
       }
 
-      // Piyon Terfisi Kontrolü
       const sourcePiece = game.get(selectedSquare);
       const isPawn = sourcePiece && sourcePiece.type === 'p';
       const isPromotionRank = (game.turn() === 'w' && square[1] === '8') || (game.turn() === 'b' && square[1] === '1');
@@ -382,6 +386,31 @@
       });
     }
 
+    function highlightLastMoveAndCheck(lastMove) {
+      $('#board .square-55d63').removeClass('highlight-move check-square');
+
+      if (lastMove) {
+        $('#board .square-' + lastMove.from).addClass('highlight-move');
+        $('#board .square-' + lastMove.to).addClass('highlight-move');
+      }
+
+      const inCheck = typeof game.in_check === 'function' ? game.in_check() : game.inCheck();
+      if (inCheck) {
+        const turn = game.turn();
+        const boardState = game.board();
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = boardState[r][c];
+            if (p && p.type === 'k' && p.color === turn) {
+              const file = String.fromCharCode(97 + c);
+              const rank = 8 - r;
+              $('#board .square-' + file + rank).addClass('check-square');
+            }
+          }
+        }
+      }
+    }
+
     function sendMessage() {
       const input = document.getElementById('chat-input');
       if (input.value.trim()) {
@@ -408,9 +437,12 @@
 
       updateTimers(data.whiteTime, data.blackTime, game.turn());
       updateHistory();
+      highlightLastMoveAndCheck(data.lastMove);
 
       if (fenChanged && data.lastMove) {
-        if (data.lastMove.captured) captureSound.play().catch(()=>{});
+        const inCheck = typeof game.in_check === 'function' ? game.in_check() : game.inCheck();
+        if (inCheck) checkSound.play().catch(()=>{});
+        else if (data.lastMove.captured) captureSound.play().catch(()=>{});
         else moveSound.play().catch(()=>{});
       }
     });
