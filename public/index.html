@@ -52,6 +52,18 @@
     .timer { font-size: 1.4rem; font-weight: bold; font-family: monospace; }
     .timer.active { color: #4CAF50; }
 
+    /* Yenen Taşlar Panelleri */
+    .captured-pieces {
+      width: 400px; max-width: 90vw; min-height: 28px;
+      display: flex; align-items: center; gap: 4px;
+      background: #1a1a1a; padding: 4px 10px; border-radius: 4px; margin: 4px 0;
+    }
+    .captured-pieces img { width: 20px; height: 20px; }
+    .score-diff {
+      font-size: 0.8rem; font-weight: bold; color: #888; margin-left: 6px;
+      background: #2a2a2a; padding: 2px 6px; border-radius: 10px;
+    }
+
     #board { width: 400px; max-width: 90vw; border-radius: 4px; overflow: hidden; }
 
     /* TEMALAR */
@@ -104,7 +116,14 @@
     </div>
 
     <h3 id="status">Oyuncu bekleniyor...</h3>
+
+    <!-- Üst Yenen Taşlar Paneli (Rakibin Yediği / Siyah Yönü) -->
+    <div id="top-captured" class="captured-pieces"></div>
+
     <div id="board"></div>
+
+    <!-- Alt Yenen Taşlar Paneli (Sizin Yediğiniz / Beyaz Yönü) -->
+    <div id="bottom-captured" class="captured-pieces"></div>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -120,9 +139,11 @@
     let selectedTheme = 'classic';
     let currentRoomId = '';
 
-    // Ses efekti dosyaları
     const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
     const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
+
+    const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+    const startingPieces = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
 
     function playSound(isCapture) {
       if (isCapture) {
@@ -191,8 +212,8 @@
       if (board) board.position(data.fen, true);
       updateStatus();
       updateTimers(data.whiteTime, data.blackTime, game.turn());
+      updateCapturedPieces();
 
-      // Hamle yapıldıysa ses çal
       if (fenChanged && data.lastMove) {
         playSound(!!data.lastMove.captured);
       }
@@ -206,6 +227,71 @@
       alert(msg);
       document.getElementById('status').innerText = msg;
     });
+
+    function updateCapturedPieces() {
+      const currentBoard = game.board();
+      const currentCounts = {
+        w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
+        b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 }
+      };
+
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = currentBoard[row][col];
+          if (piece) {
+            currentCounts[piece.color][piece.type]++;
+          }
+        }
+      }
+
+      const capturedByWhite = []; // Siyahın eksilen taşları
+      const capturedByBlack = []; // Beyazın eksilen taşları
+      let whiteScore = 0;
+      let blackScore = 0;
+
+      ['p', 'n', 'b', 'r', 'q'].forEach(type => {
+        const missingBlack = startingPieces[type] - currentCounts.b[type];
+        for (let i = 0; i < missingBlack; i++) {
+          capturedByWhite.push('b' + type.toUpperCase());
+          whiteScore += pieceValues[type];
+        }
+
+        const missingWhite = startingPieces[type] - currentCounts.w[type];
+        for (let i = 0; i < missingWhite; i++) {
+          capturedByBlack.push('w' + type.toUpperCase());
+          blackScore += pieceValues[type];
+        }
+      });
+
+      const topDiv = document.getElementById('top-captured');
+      const bottomDiv = document.getElementById('bottom-captured');
+
+      topDiv.innerHTML = '';
+      bottomDiv.innerHTML = '';
+
+      // Oyuncu siyahsa tahtayı ters algılar
+      const isBlackPlayer = myRole === 'b';
+      const topPieces = isBlackPlayer ? capturedByBlack : capturedByWhite;
+      const bottomPieces = isBlackPlayer ? capturedByWhite : capturedByBlack;
+
+      topPieces.forEach(p => {
+        topDiv.innerHTML += `<img src="${pieceTheme(p)}" alt="${p}">`;
+      });
+      bottomPieces.forEach(p => {
+        bottomDiv.innerHTML += `<img src="${pieceTheme(p)}" alt="${p}">`;
+      });
+
+      // Puan farkını yazdır
+      const scoreDiff = whiteScore - blackScore;
+      if (scoreDiff !== 0) {
+        const diffText = scoreDiff > 0 ? `+${scoreDiff}` : `+${Math.abs(scoreDiff)}`;
+        if ((scoreDiff > 0 && !isBlackPlayer) || (scoreDiff < 0 && isBlackPlayer)) {
+          bottomDiv.innerHTML += `<span class="score-diff">${diffText}</span>`;
+        } else {
+          topDiv.innerHTML += `<span class="score-diff">${diffText}</span>`;
+        }
+      }
+    }
 
     function updateTimers(wTime, bTime, turn) {
       document.getElementById('white-timer').innerText = formatTime(wTime);
