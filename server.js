@@ -1,9 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-
-const chessModule = require('chess.js');
-const Chess = typeof chessModule === 'function' ? chessModule : (chessModule.Chess || chessModule.default);
+const { Chess } = require('chess.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,166 +11,184 @@ app.use(express.static('public'));
 
 const rooms = {};
 
-function createRoomState() {
-  return {
-    game: new Chess(),
-    players: { white: null, black: null },
-    whiteTime: 600,
-    blackTime: 600,
-    timerInterval: null
-  };
-}
-
-function startTimer(roomId) {
+function startRoomTimer(roomId) {
   const room = rooms[roomId];
-  if (!room) return;
-  if (room.timerInterval) clearInterval(room.timerInterval);
+  if (!room || room.timerInterval) return;
 
   room.timerInterval = setInterval(() => {
-    if (!rooms[roomId]) {
+    if (room.game.game_over()) {
       clearInterval(room.timerInterval);
+      room.timerInterval = null;
       return;
     }
 
-    if (room.game.game_over && room.game.game_over()) {
-      clearInterval(room.timerInterval);
-      return;
-    }
-
-    if (room.game.turn() === 'w') {
+    const turn = room.game.turn();
+    if (turn === 'w') {
       room.whiteTime--;
       if (room.whiteTime <= 0) {
+        room.whiteTime = 0;
         clearInterval(room.timerInterval);
+        room.timerInterval = null;
         io.to(roomId).emit('gameOver', 'Süre Bitti! Siyah Kazandı.');
       }
     } else {
       room.blackTime--;
       if (room.blackTime <= 0) {
+        room.blackTime = 0;
         clearInterval(room.timerInterval);
+        room.timerInterval = null;
         io.to(roomId).emit('gameOver', 'Süre Bitti! Beyaz Kazandı.');
       }
     }
 
-    io.to(roomId).emit('timerUpdate', { whiteTime: room.whiteTime, blackTime: room.blackTime, turn: room.game.turn() });
+    io.to(roomId).emit('timerUpdate', {
+      whiteTime: room.whiteTime,
+      blackTime: room.blackTime,
+      turn: turn
+    });
   }, 1000);
 }
 
+function resetRoomState(room) {
+  if (room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = null;
+  }
+  room.game = new Chess();
+  room.whiteTime = 600;
+  room.blackTime = 600;
+  room.lastMove = null;
+}
+
 io.on('connection', (socket) => {
-  let currentRoomId = null;
-
   socket.on('joinRoom', (roomId) => {
-    currentRoomId = roomId;
-    socket.join(roomId);
-
     if (!rooms[roomId]) {
-      rooms[roomId] = createRoomState();
+      rooms[roomId] = {
+        game: new Chess(),
+        players: {},
+        whiteTime: 600,
+        blackTime: 600,
+        timerInterval: null,
+        lastMove: null
+      };
     }
 
     const room = rooms[roomId];
+    socket.roomId = roomId;
+    socket.join(roomId);
 
-    if (!room.players.white) {
-      room.players.white = socket.id;
+    const playerColors = Object.values(room.players);
+    if (!playerColors.includes('w')) {
+      room.players[socket.id] = 'w';
       socket.emit('playerRole', 'w');
-    } else if (!room.players.black) {
-      room.players.black = socket.id;
+    } else if (!playerColors.includes('b')) {
+      room.players[socket.id] = 'b';
       socket.emit('playerRole', 'b');
-      startTimer(roomId);
+      startRoomTimer(roomId);
     } else {
       socket.emit('spectatorRole');
     }
 
-    socket.emit('boardState', { 
-      fen: room.game.fen(), 
-      whiteTime: room.whiteTime, 
-      blackTime: room.blackTime 
+    const playerCount = Object.keys(room.players).length;
+    let statusMsg = '';
+    if (playerCount === 1) statusMsg = 'Rakip bekleniyor...';
+    else if (playerCount >= 2) statusMsg = 'Oyun Başladı!';
+
+    io.to(roomId).emit('gameStatus', statusMsg);
+
+    socket.emit('boardState', {
+      fen: room.game.fen(),
+      whiteTime: room.whiteTime,
+      blackTime: room.blackTime,
+      lastMove: room.lastMove
     });
   });
 
   socket.on('move', (moveData) => {
-    if (!currentRoomId || !rooms[currentRoomId]) return;
-    const room = rooms[currentRoomId];
-    const turn = room.game.turn();
+    const room = rooms[socket.roomId];
+    if (!room) return;
 
-    if ((turn === 'w' && socket.id !== room.players.white) || 
-        (turn === 'b' && socket.id !== room.players.black)) {
-      socket.emit('boardState', { fen: room.game.fen(), whiteTime: room.whiteTime, blackTime: room.blackTime });
-      return;
-    }
+    const playerColor = room.players[socket.id];
+    if (!playerColor || playerColor !== room.game.turn()) return;
 
     try {
-      const result = room.game.move(moveData);
-      if (result) {
-        io.to(currentRoomId).emit('boardState', { 
-          fen: room.game.fen(), 
-          whiteTime: room.whiteTime, 
+      const move = room.game.move(moveData);
+      if (move) {
+        room.lastMove = { from: move.from, to: move.to, captured: move.captured };
+        io.to(socket.roomId).emit('boardState', {
+          fen: room.game.fen(),
+          whiteTime: room.whiteTime,
           blackTime: room.blackTime,
-          lastMove: result
+          lastMove: room.lastMove
         });
-      } else {
-        socket.emit('boardState', { fen: room.game.fen(), whiteTime: room.whiteTime, blackTime: room.blackTime });
+
+        if (room.game.in_checkmate()) {
+          io.to(socket.roomId).emit('gameOver', `Şah Mat! Kazanan: ${playerColor === 'w' ? 'Beyaz' : 'Siyah'}`);
+        } else if (room.game.in_draw()) {
+          io.to(socket.roomId).emit('gameOver', 'Oyun Berabere!');
+        }
       }
-    } catch (err) {
-      socket.emit('boardState', { fen: room.game.fen(), whiteTime: room.whiteTime, blackTime: room.blackTime });
+    } catch (e) {
+      console.log('Geçersiz hamle');
     }
   });
 
-  // Pes Etme İşlemi
-  socket.on('resign', () => {
-    if (!currentRoomId || !rooms[currentRoomId]) return;
-    const room = rooms[currentRoomId];
-    
-    if (room.timerInterval) clearInterval(room.timerInterval);
+  // YENİDEN BAŞLATMA İSTEĞİ
+  socket.on('requestRestart', () => {
+    const room = rooms[socket.roomId];
+    if (!room) return;
 
-    let winner = '';
-    if (socket.id === room.players.white) {
-      winner = 'Siyah (Beyaz pes etti)';
-    } else if (socket.id === room.players.black) {
-      winner = 'Beyaz (Siyah pes etti)';
-    } else {
-      return; // İzleyiciler pes edemez
-    }
-
-    io.to(currentRoomId).emit('gameOver', `Oyun Bitti! Kazanan: ${winner}`);
+    // İstek atan dışındaki diğer oyuncuya onay penceresi gönder
+    socket.to(socket.roomId).emit('restartRequested');
   });
 
-  // Oyunu Yeniden Başlatma İşlemi
-  socket.on('restartGame', () => {
-    if (!currentRoomId || !rooms[currentRoomId]) return;
-    const room = rooms[currentRoomId];
+  // İSTEK KABUL EDİLDİ
+  socket.on('acceptRestart', () => {
+    const room = rooms[socket.roomId];
+    if (!room) return;
 
-    room.game = new Chess();
-    room.whiteTime = 600;
-    room.blackTime = 600;
-    if (room.timerInterval) clearInterval(room.timerInterval);
-
-    if (room.players.white && room.players.black) {
-      startTimer(currentRoomId);
+    resetRoomState(room);
+    if (Object.keys(room.players).length >= 2) {
+      startRoomTimer(socket.roomId);
     }
 
-    io.to(currentRoomId).emit('boardState', {
+    io.to(socket.roomId).emit('boardState', {
       fen: room.game.fen(),
       whiteTime: room.whiteTime,
       blackTime: room.blackTime,
       lastMove: null
     });
-    io.to(currentRoomId).emit('gameStatus', 'Oyun yeniden başlatıldı!');
+    io.to(socket.roomId).emit('gameStatus', 'Oyun yeniden başlatıldı!');
+  });
+
+  // İSTEK REDDEDİLDİ
+  socket.on('declineRestart', () => {
+    socket.to(socket.roomId).emit('restartDeclined');
+  });
+
+  socket.on('resign', () => {
+    const room = rooms[socket.roomId];
+    if (!room) return;
+    const playerColor = room.players[socket.id];
+    if (playerColor) {
+      const winner = playerColor === 'w' ? 'Siyah' : 'Beyaz';
+      io.to(socket.roomId).emit('gameOver', `${playerColor === 'w' ? 'Beyaz' : 'Siyah'} pes etti! Kazanan: ${winner}`);
+    }
   });
 
   socket.on('disconnect', () => {
-    if (!currentRoomId || !rooms[currentRoomId]) return;
-    const room = rooms[currentRoomId];
-
-    if (socket.id === room.players.white) room.players.white = null;
-    if (socket.id === room.players.black) room.players.black = null;
-
-    if (!room.players.white && !room.players.black) {
-      if (room.timerInterval) clearInterval(room.timerInterval);
-      delete rooms[currentRoomId];
+    const room = rooms[socket.roomId];
+    if (room) {
+      delete room.players[socket.id];
+      if (Object.keys(room.players).length === 0) {
+        if (room.timerInterval) clearInterval(room.timerInterval);
+        delete rooms[socket.roomId];
+      } else {
+        io.to(socket.roomId).emit('gameStatus', 'Rakip ayrıldı.');
+      }
     }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Sunucu ${PORT} portunda çalışıyor.`);
-});
+server.listen(PORT, () => console.log(`Sunucu ${PORT} portunda çalışıyor...`));
