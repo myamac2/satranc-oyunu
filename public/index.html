@@ -259,6 +259,11 @@
       overflow: hidden;
       border: 1px solid var(--border-color);
       box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+      user-select: none;
+    }
+
+    .square-55d63 {
+      cursor: pointer;
     }
 
     .white-1e1d3 {
@@ -273,6 +278,11 @@
 
     .highlight-move {
       box-shadow: inset 0 0 0 1000px rgba(255, 215, 0, 0.28) !important;
+    }
+
+    /* SEÇİLİ TAŞ KARESE VURGUSU */
+    .selected-square {
+      background-color: rgba(59, 130, 246, 0.4) !important;
     }
 
     /* ŞAH ÇEKİLME / MAT KIRMIZI PARLAMA EFEKTİ */
@@ -489,6 +499,7 @@
     let board = null;
     let myRole = null;
     let currentRoomId = '';
+    let selectedSquare = null; // Tıklama takibi için seçili kare
 
     const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
     const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
@@ -511,7 +522,7 @@
     }
 
     function removeHighlights() {
-      $('#board .square-55d63').removeClass('highlight-move check-square');
+      $('#board .square-55d63').removeClass('highlight-move check-square selected-square');
     }
 
     function highlightSquare(square) {
@@ -613,6 +624,8 @@
       const fenChanged = data.fen !== game.fen();
       game.load(data.fen);
       if (board) board.position(data.fen, true);
+
+      selectedSquare = null; // Yeni tahta durumunda seçimi sıfırla
       updateStatus();
       updateTimers(data.whiteTime, data.blackTime, game.turn());
       updateCapturedPieces();
@@ -742,14 +755,6 @@
       return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    function onDragStart(source, piece) {
-      if (game.game_over() || myRole === 's') return false;
-      if ((game.turn() === 'w' && myRole !== 'w') || (game.turn() === 'b' && myRole !== 'b')) return false;
-      if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
-
-      showLegalMoves(source);
-    }
-
     function showLegalMoves(square) {
       removeGreySquares();
       const moves = game.moves({ square: square, verbose: true });
@@ -761,31 +766,62 @@
       }
     }
 
-    function onMouseoverSquare(square) {
+    // TIKLAYARAK OYNAMA MANTIĞI (CLICK-TO-MOVE)
+    function handleSquareClick(square) {
       if (game.game_over() || myRole === 's') return;
       if ((game.turn() === 'w' && myRole !== 'w') || (game.turn() === 'b' && myRole !== 'b')) return;
 
-      const piece = game.get(square);
-      if (piece && piece.color === game.turn()) {
-        showLegalMoves(square);
+      const pieceOnSquare = game.get(square);
+
+      // 1. Durum: Henüz hiçbir taş seçilmediyse
+      if (!selectedSquare) {
+        if (pieceOnSquare && pieceOnSquare.color === game.turn()) {
+          selectedSquare = square;
+          $('#board .square-' + square).addClass('selected-square');
+          showLegalMoves(square);
+        }
+        return;
       }
-    }
 
-    function onMouseoutSquare() {
-      removeGreySquares();
-    }
+      // 2. Durum: Zaten bir taş seçilmişken tekrar aynı kareye tıklanırsa seçimi iptal et
+      if (selectedSquare === square) {
+        selectedSquare = null;
+        $('#board .square-55d63').removeClass('selected-square');
+        removeGreySquares();
+        return;
+      }
 
-    function onDrop(source, target) {
-      removeGreySquares();
-      const move = game.move({ from: source, to: target, promotion: 'q' });
-      if (move === null) return 'snapback';
-      
-      removeHighlights();
-      highlightSquare(source);
-      highlightSquare(target);
-      highlightCheck();
+      // 3. Durum: Seçili bir taş varken kendi başka bir taşına tıklanırsa seçimi değiştir
+      if (pieceOnSquare && pieceOnSquare.color === game.turn()) {
+        $('#board .square-55d63').removeClass('selected-square');
+        selectedSquare = square;
+        $('#board .square-' + square).addClass('selected-square');
+        showLegalMoves(square);
+        return;
+      }
 
-      socket.emit('move', { from: source, to: target, promotion: 'q' });
+      // 4. Durum: Seçili taş ile tıklanan kareye hamle yapmayı dene
+      const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+
+      if (move === null) {
+        // Geçersiz bir kareye tıklandıysa seçimi sıfırla
+        selectedSquare = null;
+        $('#board .square-55d63').removeClass('selected-square');
+        removeGreySquares();
+      } else {
+        // Hamle geçerliyse sunucuya bildir
+        const fromSquare = selectedSquare;
+        selectedSquare = null;
+        
+        removeGreySquares();
+        removeHighlights();
+        highlightSquare(fromSquare);
+        highlightSquare(square);
+        highlightCheck();
+
+        board.position(game.fen());
+        socket.emit('move', { from: fromSquare, to: square, promotion: 'q' });
+      }
     }
 
     function updateStatus() {
@@ -807,16 +843,18 @@
 
     function initBoard() {
       if (board) return;
+
       board = Chessboard('board', {
-        draggable: true,
+        draggable: false, // Sürüklemeyi kapattık, tıklayarak oynama aktif
         position: 'start',
         orientation: myRole === 'b' ? 'black' : 'white',
-        pieceTheme: pieceTheme,
-        onDragStart: onDragStart,
-        onMouseoverSquare: onMouseoverSquare,
-        onMouseoutSquare: onMouseoutSquare,
-        onDrop: onDrop,
-        onSnapEnd: () => board.position(game.fen())
+        pieceTheme: pieceTheme
+      });
+
+      // Karelere tıklama olayını dinle
+      $('#board').on('click', '.square-55d63', function () {
+        const square = $(this).attr('data-square');
+        handleSquareClick(square);
       });
     }
   </script>
