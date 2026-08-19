@@ -8,7 +8,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
   <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
   
   <style>
@@ -42,7 +41,6 @@
       padding: 20px;
     }
 
-    /* LOBİ EKRANI */
     #lobby-screen {
       display: flex;
       flex-direction: column;
@@ -59,9 +57,7 @@
     #lobby-screen h2 {
       font-size: 1.5rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
       margin-bottom: 24px;
-      color: var(--text-main);
     }
 
     .input-group {
@@ -77,7 +73,6 @@
       font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
     }
 
     input[type="text"] {
@@ -89,13 +84,7 @@
       text-align: center;
       font-size: 1rem;
       font-weight: 600;
-      letter-spacing: 0.1em;
       outline: none;
-      transition: border-color 0.2s;
-    }
-
-    input[type="text"]:focus {
-      border-color: #3b82f6;
     }
 
     .action-btn {
@@ -106,17 +95,9 @@
       border: none;
       border-radius: 10px;
       font-weight: 700;
-      font-size: 0.95rem;
       cursor: pointer;
-      transition: transform 0.15s, background-color 0.2s;
     }
 
-    .action-btn:hover {
-      background: #e5e7eb;
-      transform: translateY(-1px);
-    }
-
-    /* OYUN EKRANI */
     #game-screen {
       display: none;
       flex-direction: row;
@@ -150,12 +131,10 @@
     .room-badge {
       font-size: 0.85rem;
       color: var(--text-muted);
-      font-weight: 500;
     }
 
     .room-badge strong {
       color: var(--text-main);
-      font-weight: 700;
     }
 
     .copy-btn {
@@ -166,15 +145,8 @@
       border-radius: 6px;
       cursor: pointer;
       font-size: 0.75rem;
-      font-weight: 600;
-      transition: background 0.2s;
     }
 
-    .copy-btn:hover {
-      background: #2a2a32;
-    }
-
-    /* SAYAÇ KARTLARI */
     .timer-container {
       display: flex;
       justify-content: space-between;
@@ -191,26 +163,22 @@
       border: 1px solid var(--border-color);
       padding: 10px;
       border-radius: 12px;
-      transition: border-color 0.3s;
     }
 
     .timer-card.active {
       border-color: var(--accent-green);
-      box-shadow: 0 0 15px rgba(34, 197, 94, 0.15);
     }
 
     .player-label {
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--text-muted);
-      margin-bottom: 2px;
     }
 
     .timer {
       font-size: 1.3rem;
       font-weight: 700;
       font-family: monospace;
-      color: var(--text-main);
     }
 
     .status-text {
@@ -221,7 +189,6 @@
       min-height: 24px;
     }
 
-    /* YENEN TAŞLAR PANELLERİ */
     .captured-pieces {
       width: 100%;
       min-height: 32px;
@@ -237,26 +204,22 @@
     .captured-pieces img {
       width: 22px;
       height: 22px;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
     }
 
     .score-diff {
       font-size: 0.75rem;
       font-weight: 700;
-      color: var(--text-main);
       background: #22222a;
       padding: 2px 8px;
       border-radius: 12px;
       margin-left: auto;
     }
 
-    /* TAHTA VE STİLİ */
     #board {
       width: 100%;
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid var(--border-color);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.9);
       user-select: none;
     }
 
@@ -266,12 +229,10 @@
 
     .white-1e1d3 {
       background-color: #383b42 !important;
-      color: #383b42;
     }
 
     .black-3c85d {
       background-color: #1c1d21 !important;
-      color: #1c1d21;
     }
 
     .highlight-move {
@@ -284,7 +245,6 @@
 
     .check-square {
       background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, rgba(220, 38, 38, 0.6) 50%, rgba(185, 28, 28, 0) 85%) !important;
-      box-shadow: inset 0 0 12px rgba(239, 68, 68, 0.8) !important;
     }
 
     .legal-dot::after {
@@ -313,10 +273,8 @@
       border-radius: 50%;
       pointer-events: none;
       z-index: 10;
-      background-color: transparent !important;
     }
 
-    /* HAMLE GEÇMİŞİ PANELİ */
     .move-history-panel {
       width: 260px;
       height: 580px;
@@ -335,10 +293,8 @@
       font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
       display: flex;
       justify-content: space-between;
-      align-items: center;
     }
 
     .history-list {
@@ -347,24 +303,11 @@
       padding: 8px 12px;
     }
 
-    .history-list::-webkit-scrollbar {
-      width: 6px;
-    }
-    .history-list::-webkit-scrollbar-thumb {
-      background: var(--border-color);
-      border-radius: 3px;
-    }
-
     .move-row {
       display: flex;
       padding: 6px 8px;
       font-size: 0.88rem;
       font-weight: 600;
-      border-radius: 6px;
-    }
-
-    .move-row:nth-child(even) {
-      background: rgba(255, 255, 255, 0.02);
     }
 
     .move-num {
@@ -374,15 +317,12 @@
 
     .move-white, .move-black {
       flex: 1;
-      color: var(--text-main);
     }
 
-    /* KONTROL BUTONLARI */
     .control-buttons {
       display: flex;
       gap: 12px;
       width: 100%;
-      margin-top: 4px;
     }
 
     .btn {
@@ -391,28 +331,11 @@
       border: 1px solid var(--border-color);
       border-radius: 10px;
       font-weight: 600;
-      font-size: 0.85rem;
       cursor: pointer;
-      transition: all 0.2s;
       background: var(--bg-card);
       color: var(--text-main);
     }
 
-    .btn:hover {
-      background: var(--bg-card-hover);
-    }
-
-    .btn-resign:hover {
-      border-color: var(--accent-red);
-      color: var(--accent-red);
-    }
-
-    .btn-restart:hover {
-      border-color: var(--accent-orange);
-      color: var(--accent-orange);
-    }
-
-    /* MODAL (ONAY PENCERESİ) STİLLERİ */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -434,7 +357,6 @@
       border-radius: 16px;
       width: 320px;
       text-align: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.9);
     }
 
     .modal-box h3 {
@@ -470,7 +392,6 @@
         flex-direction: column;
         align-items: center;
       }
-
       .move-history-panel {
         width: 100%;
         max-width: 440px;
@@ -481,21 +402,16 @@
 </head>
 <body>
 
-  <!-- LOBİ EKRANI -->
   <div id="lobby-screen">
     <h2>STUDIO CHESS</h2>
-    
     <div class="input-group">
       <label>Oda Kodu</label>
       <input type="text" id="room-input" placeholder="Rastgele Veya Kod Girin" maxlength="10">
     </div>
-
     <button class="action-btn" onclick="joinGame()">Odaya Katıl</button>
   </div>
 
-  <!-- OYUN EKRANI -->
   <div id="game-screen">
-    
     <div class="board-container">
       <div class="top-bar">
         <div class="room-badge">Oda Kodu: <strong id="display-room-id">-</strong></div>
@@ -514,16 +430,13 @@
       </div>
 
       <div id="status" class="status-text">Oyuncu bekleniyor...</div>
-
       <div id="top-captured" class="captured-pieces"></div>
-
       <div id="board"></div>
-
       <div id="bottom-captured" class="captured-pieces"></div>
 
       <div class="control-buttons">
-        <button class="btn btn-resign" onclick="resignGame()">Pes Et</button>
-        <button class="btn btn-restart" onclick="restartGame()">Yeniden Başlat</button>
+        <button class="btn" onclick="resignGame()">Pes Et</button>
+        <button class="btn" onclick="restartGame()">Yeniden Başlat</button>
       </div>
     </div>
 
@@ -534,10 +447,8 @@
       </div>
       <div id="history-list" class="history-list"></div>
     </div>
-
   </div>
 
-  <!-- YENİDEN BAŞLATMA ONAY MODAL'I -->
   <div id="restart-modal" class="modal-overlay">
     <div class="modal-box">
       <h3>Yeniden Başlatma İsteği</h3>
@@ -627,6 +538,7 @@
     const roomParam = urlParams.get('room');
     if (roomParam) {
       document.getElementById('room-input').value = roomParam.toUpperCase();
+      joinGame();
     }
 
     function generateRoomId() {
@@ -648,7 +560,7 @@
     function copyInviteLink() {
       const inviteUrl = window.location.origin + '?room=' + currentRoomId;
       navigator.clipboard.writeText(inviteUrl).then(() => {
-        alert('Davet linki kopyalandı! Arkadaşınla paylaşabilirsin:\n' + inviteUrl);
+        alert('Davet linki kopyalandı:\n' + inviteUrl);
       });
     }
 
@@ -659,14 +571,12 @@
       }
     }
 
-    // YENİDEN BAŞLATMA İSTEĞİ GÖNDERME
     function restartGame() {
       if (myRole === 's') return;
       alert('Yeniden başlatma isteği rakibinize gönderildi.');
       socket.emit('requestRestart');
     }
 
-    // RAKİBİN YENİDEN BAŞLATMA CEVABI
     function respondRestart(accepted) {
       document.getElementById('restart-modal').style.display = 'none';
       if (accepted) {
