@@ -267,6 +267,40 @@
       box-shadow: inset 0 0 0 1000px rgba(255, 215, 0, 0.28) !important;
     }
 
+    /* YASAL HAMLE YEŞİL NOKTA / HALKA STİLİ */
+    .legal-dot {
+      position: relative;
+    }
+
+    .legal-dot::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 26%;
+      height: 26%;
+      background-color: rgba(34, 197, 94, 0.7);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .legal-capture::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      border: 5px solid rgba(34, 197, 94, 0.7);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10;
+      background-color: transparent !important;
+    }
+
     /* KONTROL BUTONLARI */
     .control-buttons {
       display: flex;
@@ -393,6 +427,20 @@
       $('#board .square-' + square).addClass('highlight-move');
     }
 
+    // Yasal Hamle Noktalarını Temizle / Göster
+    function removeGreySquares() {
+      $('#board .square-55d63').removeClass('legal-dot legal-capture');
+    }
+
+    function greySquare(square, isCapture) {
+      const $square = $('#board .square-' + square);
+      if (isCapture) {
+        $square.addClass('legal-capture');
+      } else {
+        $square.addClass('legal-dot');
+      }
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
@@ -458,8 +506,8 @@
       updateTimers(data.whiteTime, data.blackTime, game.turn());
       updateCapturedPieces();
 
-      // Hamle vurgulaması
       removeHighlights();
+      removeGreySquares();
       if (data.lastMove) {
         highlightSquare(data.lastMove.from);
         highlightSquare(data.lastMove.to);
@@ -560,9 +608,38 @@
       if (game.game_over() || myRole === 's') return false;
       if ((game.turn() === 'w' && myRole !== 'w') || (game.turn() === 'b' && myRole !== 'b')) return false;
       if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
+
+      // Taş sürüklenmeye başladığında gidebileceği yasal kareleri göster
+      showLegalMoves(source);
+    }
+
+    function showLegalMoves(square) {
+      removeGreySquares();
+      const moves = game.moves({ square: square, verbose: true });
+      if (moves.length === 0) return;
+
+      for (let i = 0; i < moves.length; i++) {
+        const isCapture = !!moves[i].captured;
+        greySquare(moves[i].to, isCapture);
+      }
+    }
+
+    function onMouseoverSquare(square) {
+      if (game.game_over() || myRole === 's') return;
+      if ((game.turn() === 'w' && myRole !== 'w') || (game.turn() === 'b' && myRole !== 'b')) return;
+
+      const piece = game.get(square);
+      if (piece && piece.color === game.turn()) {
+        showLegalMoves(square);
+      }
+    }
+
+    function onMouseoutSquare() {
+      removeGreySquares();
     }
 
     function onDrop(source, target) {
+      removeGreySquares();
       const move = game.move({ from: source, to: target, promotion: 'q' });
       if (move === null) return 'snapback';
       
@@ -597,6 +674,8 @@
         orientation: myRole === 'b' ? 'black' : 'white',
         pieceTheme: pieceTheme,
         onDragStart: onDragStart,
+        onMouseoverSquare: onMouseoverSquare,
+        onMouseoutSquare: onMouseoutSquare,
         onDrop: onDrop,
         onSnapEnd: () => board.position(game.fen())
       });
