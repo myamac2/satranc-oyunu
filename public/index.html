@@ -22,6 +22,27 @@
       --accent-blue: #3b82f6;
       --text-main: #f3f4f6;
       --text-muted: #71717a;
+
+      /* Varsayılan Tahta Renkleri (OLED Karanlık) */
+      --sq-light: #3d414a;
+      --sq-dark: #212328;
+      --sq-light-text: #71717a;
+      --sq-dark-text: #4b4d54;
+    }
+
+    /* Tema Seçenekleri CSS Değişkenleri */
+    body.theme-wood {
+      --sq-light: #eadeca;
+      --sq-dark: #b8860b;
+      --sq-light-text: #8b5a2b;
+      --sq-dark-text: #5c3a21;
+    }
+
+    body.theme-neon {
+      --sq-light: #1e293b;
+      --sq-dark: #0f172a;
+      --sq-light-text: #38bdf8;
+      --sq-dark-text: #1e3a8a;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -85,6 +106,13 @@
       background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 12px;
     }
 
+    .theme-selector-group {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .theme-selector-group select {
+      padding: 4px 8px; font-size: 0.78rem; border-radius: 8px; background: #18181f;
+    }
+
     .player-card {
       display: flex; justify-content: space-between; align-items: center; width: 100%;
       background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 14px; border-radius: 12px; min-height: 48px;
@@ -98,8 +126,9 @@
 
     #board { width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
 
-    .white-1e1d3 { background-color: #3d414a !important; color: #71717a !important; }
-    .black-3c85d { background-color: #212328 !important; color: #4b4d54 !important; }
+    /* Dinamik Kare Renkleri */
+    .white-1e1d3 { background-color: var(--sq-light) !important; color: var(--sq-light-text) !important; }
+    .black-3c85d { background-color: var(--sq-dark) !important; color: var(--sq-dark-text) !important; }
 
     .highlight-move { box-shadow: inset 0 0 0 1000px rgba(234, 179, 8, 0.35) !important; }
     .selected-square { background-color: rgba(59, 130, 246, 0.5) !important; }
@@ -167,7 +196,7 @@
     }
   </style>
 </head>
-<body>
+<body class="theme-oled">
 
   <div id="toast-container"></div>
 
@@ -195,6 +224,21 @@
     <div class="board-container">
       <div class="top-bar">
         <span style="font-size:0.8rem; color:var(--text-muted)">Oda: <strong id="display-room-id" style="color:#fff">-</strong></span>
+        
+        <!-- Tema Seçim Alanı -->
+        <div class="theme-selector-group">
+          <select id="board-theme-select" onchange="changeBoardTheme(this.value)">
+            <option value="theme-oled">🖤 OLED Karanlık</option>
+            <option value="theme-wood">🪵 Ahşap Sıcaklığı</option>
+            <option value="theme-neon">⚡ Cyber Neon</option>
+          </select>
+          <select id="piece-theme-select" onchange="changePieceTheme(this.value)">
+            <option value="maestro">🎨 Maestro Seti</option>
+            <option value="neo">✨ Neo Modern</option>
+            <option value="staunty">♟️ Klasik Staunton</option>
+          </select>
+        </div>
+
         <div>
           <button class="btn" style="padding:4px 8px;" onclick="copyPGN()">PGN</button>
           <button class="btn" style="padding:4px 8px;" onclick="copyFEN()">FEN</button>
@@ -281,13 +325,29 @@
     let pendingMove = null;
     let currentPGN = '';
     let previousFen = '';
+    let currentPieceSet = 'maestro';
 
     const moveSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Move.mp3');
     const captureSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Capture.mp3');
     const checkSound = new Audio('https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/sound/standard/Check.mp3');
 
     function pieceTheme(piece) {
-      return 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/maestro/' + piece + '.svg';
+      return `https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/${currentPieceSet}/${piece}.svg`;
+    }
+
+    function changeBoardTheme(themeName) {
+      document.body.className = themeName;
+    }
+
+    function changePieceTheme(pieceSetName) {
+      currentPieceSet = pieceSetName;
+      if (board) {
+        board.destroy();
+        board = null;
+        initBoard();
+        board.position(game.fen());
+        updateCapturedPieces();
+      }
     }
 
     function playMoveAudio(moveObj) {
@@ -469,8 +529,8 @@
         }
       }
 
-      const capturedW = []; // Beyazın kaybettiği taşlar
-      const capturedB = []; // Siyahın kaybettiği taşlar
+      const capturedW = [];
+      const capturedB = [];
 
       ['p', 'n', 'b', 'r', 'q'].forEach(type => {
         const missingW = initialCounts[type] - currentCounts['w'][type];
@@ -480,7 +540,6 @@
         for (let i = 0; i < missingB; i++) capturedB.push('b' + type.toUpperCase());
       });
 
-      // Görünüm oryantasyonuna göre yenen taşları dağıt
       const topCapturedContainer = document.getElementById('top-captured');
       const bottomCapturedContainer = document.getElementById('bottom-captured');
 
