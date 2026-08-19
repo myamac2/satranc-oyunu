@@ -11,15 +11,7 @@ app.use(express.static('public'));
 
 const rooms = {};
 
-// Taş değerleri (Bot değerlendirme algoritması için)
-const pieceValues = {
-  p: 10,
-  n: 30,
-  b: 30,
-  r: 50,
-  q: 90,
-  k: 900
-};
+const pieceValues = { p: 10, n: 30, b: 30, r: 50, q: 90, k: 900 };
 
 io.on('connection', (socket) => {
   let currentRoom = null;
@@ -108,7 +100,6 @@ io.on('connection', (socket) => {
           return;
         }
 
-        // Akıllı Bot Hamlesi
         if (room.isVsAi && game.turn() === 'b' && !isGameOver) {
           setTimeout(() => makeSmartAiMove(currentRoom), 500);
         }
@@ -118,7 +109,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Bot için Hamle Geri Alma Event'i
   socket.on('takeback', () => {
     const room = rooms[currentRoom];
     if (!room || !room.isVsAi || userRole !== 'w') return;
@@ -134,12 +124,11 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Bot maçında hamle geri alma: Sıra Beyazdaysa hem botun hem oyuncunun hamlesini geri al
     if (room.game.turn() === 'w' && history.length >= 2) {
-      room.game.undo(); // Bot hamlesini geri al
-      room.game.undo(); // Oyuncu hamlesini geri al
+      room.game.undo();
+      room.game.undo();
     } else if (room.game.turn() === 'b' && history.length >= 1) {
-      room.game.undo(); // Sadece oyuncunun hamlesini geri al
+      room.game.undo();
     } else if (history.length === 1) {
       room.game.undo();
     }
@@ -209,29 +198,39 @@ io.on('connection', (socket) => {
     io.to(currentRoom).emit('gameStatus', 'Oyun yeniden başlatıldı!');
   });
 
-  socket.on('disconnect', () => {
-    if (currentRoom && rooms[currentRoom]) {
-      const room = rooms[currentRoom];
-      if (socket.id === room.white) room.white = null;
-      if (socket.id === room.black) room.black = null;
-      
-      room.spectators = room.spectators.filter(id => id !== socket.id);
+  // Odadan ayrılma (Ana Menüye Dönüş)
+  socket.on('leaveRoom', () => {
+    cleanUpUserFromRoom(socket, currentRoom);
+    currentRoom = null;
+    userRole = null;
+  });
 
-      if (!room.white && !room.black && room.spectators.length === 0) {
-        clearInterval(room.timerInterval);
-        delete rooms[currentRoom];
-      }
-    }
+  socket.on('disconnect', () => {
+    cleanUpUserFromRoom(socket, currentRoom);
   });
 });
 
-// Akıllı Yapay Zeka
+function cleanUpUserFromRoom(socket, roomId) {
+  if (roomId && rooms[roomId]) {
+    const room = rooms[roomId];
+    if (socket.id === room.white) room.white = null;
+    if (socket.id === room.black) room.black = null;
+    
+    room.spectators = room.spectators.filter(id => id !== socket.id);
+    socket.leave(roomId);
+
+    if (!room.white && !room.black && room.spectators.length === 0) {
+      clearInterval(room.timerInterval);
+      delete rooms[roomId];
+    }
+  }
+}
+
 function makeSmartAiMove(roomId) {
   const room = rooms[roomId];
   if (!room) return;
   const game = room.game;
   
-  // Eğer oyuncu bot hamle yapmadan hemen önce hamleyi geri aldıysa çalışma
   if (game.turn() !== 'b') return;
 
   const moves = game.moves({ verbose: true });

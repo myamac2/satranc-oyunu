@@ -137,10 +137,10 @@
     .emoji-row { display: flex; gap: 6px; padding: 4px 8px; background: #121216; overflow-x: auto; }
     .emoji-btn { background: none; border: none; font-size: 1.1rem; cursor: pointer; }
 
-    .control-buttons { display: flex; gap: 8px; width: 100%; }
+    .control-buttons { display: flex; gap: 6px; width: 100%; flex-wrap: wrap; }
     .btn {
-      flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 10px;
-      font-weight: 600; cursor: pointer; background: var(--bg-card); color: var(--text-main); font-size: 0.8rem;
+      flex: 1; min-width: 70px; padding: 10px 6px; border: 1px solid var(--border-color); border-radius: 10px;
+      font-weight: 600; cursor: pointer; background: var(--bg-card); color: var(--text-main); font-size: 0.78rem; text-align: center;
     }
     .btn:hover { background: var(--bg-card-hover); }
 
@@ -216,6 +216,7 @@
         <button class="btn" onclick="offerDraw()">Beraberlik</button>
         <button class="btn" onclick="resignGame()">Pes Et</button>
         <button class="btn" onclick="restartGame()">Sıfırla</button>
+        <button class="btn" style="background:#1e1e24;" onclick="goToMainMenu()">🏠 Ana Menü</button>
       </div>
     </div>
 
@@ -242,7 +243,6 @@
     </div>
   </div>
 
-  <!-- Piyon Terfi Modalı -->
   <div id="promotion-modal" class="modal-overlay">
     <div class="modal-box">
       <h3>Piyon Terfisi</h3>
@@ -263,7 +263,7 @@
 
   <script>
     const socket = io();
-    const game = new Chess();
+    let game = new Chess();
     let board = null;
     let myRole = null;
     let currentRoomId = '';
@@ -304,6 +304,26 @@
         isVsAi: isVsAi
       });
       initBoard();
+    }
+
+    function goToMainMenu() {
+      if (confirm('Ana menüye dönmek istediğinizden emin misiniz? Devam eden maçtan ayrılacaksınız.')) {
+        socket.emit('leaveRoom');
+        
+        // Ekranı temizle ve sıfırla
+        game.reset();
+        if (board) {
+          board.destroy();
+          board = null;
+        }
+        document.getElementById('chat-messages').innerHTML = '';
+        document.getElementById('history-list').innerHTML = '';
+        document.getElementById('move-count').innerText = '0';
+        
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('lobby-screen').style.display = 'flex';
+        showToast('Ana menüye dönüldü.', 'info');
+      }
     }
 
     function handleSquareClick(square) {
@@ -446,7 +466,6 @@
       updateHistory();
       highlightLastMoveAndCheck(data.lastMove);
 
-      // Bot maçlarında Geri Al butonunu göster ve kalan hak ile güncelle
       if (data.isVsAi) {
         const $btn = $('#takeback-btn');
         $btn.show().text(`Geri Al (${data.takebacksRemaining})`);
