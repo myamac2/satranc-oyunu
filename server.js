@@ -16,7 +16,7 @@ io.on('connection', (socket) => {
   let currentRoom = null;
   let userRole = null;
 
-  socket.on('joinRoom', ({ roomId, timeConfig, isVsAi, playerId }) => {
+  socket.on('joinRoom', ({ roomId, timeConfig, isVsAi }) => {
     currentRoom = roomId;
 
     if (!rooms[roomId]) {
@@ -28,8 +28,6 @@ io.on('connection', (socket) => {
         game: new Chess(),
         white: null,
         black: null,
-        whiteId: null,
-        blackId: null,
         spectators: [],
         timers: { w: initialTime, b: initialTime },
         increment: increment,
@@ -45,34 +43,21 @@ io.on('connection', (socket) => {
 
     const room = rooms[roomId];
 
-    // Aynı playerId ile geri dönen oyuncuya (sayfa yenileme/kopan bağlantı) koltuğunu geri ver.
-    if (playerId && playerId === room.whiteId) {
+    if (!room.white) {
       room.white = socket.id;
       userRole = 'w';
       socket.emit('playerRole', 'w');
-    } else if (playerId && playerId === room.blackId && room.blackId !== 'BOT') {
-      room.black = socket.id;
-      userRole = 'b';
-      socket.emit('playerRole', 'b');
-    } else if (!room.white) {
-      room.white = socket.id;
-      room.whiteId = playerId || socket.id;
-      userRole = 'w';
-      socket.emit('playerRole', 'w');
-
-      if (room.isVsAi) {
-        // Bota karşı oyunda tek oyuncu bağlanır bağlanmaz oyun (ve timer) başlar.
-        room.black = 'BOT';
-        room.blackId = 'BOT';
-        io.to(roomId).emit('gameStatus', 'Yapay Zekaya Karşı Oyun Başladı!');
-        startTimer(roomId);
-      }
     } else if (!room.black && !room.isVsAi) {
       room.black = socket.id;
-      room.blackId = playerId || socket.id;
       userRole = 'b';
       socket.emit('playerRole', 'b');
       io.to(roomId).emit('gameStatus', 'Oyun Başladı!');
+      startTimer(roomId);
+    } else if (room.isVsAi && !room.black) {
+      room.black = 'BOT';
+      userRole = 'w';
+      socket.emit('playerRole', 'w');
+      io.to(roomId).emit('gameStatus', 'Yapay Zekaya Karşı Oyun Başladı!');
       startTimer(roomId);
     } else {
       userRole = 's';
@@ -95,8 +80,7 @@ io.on('connection', (socket) => {
       const move = game.move(moveData);
       if (move) {
         room.lastMove = move;
-        room.drawOffers = { w: false, b: false }; // Hamle yapılınca bekleyen teklifler geçersiz olur
-
+        
         if (!room.isUnlimited) {
           if (move.color === 'w') room.timers.w += room.increment;
           if (move.color === 'b') room.timers.b += room.increment;
@@ -189,15 +173,7 @@ io.on('connection', (socket) => {
     const room = rooms[currentRoom];
     if (!room) return;
     clearInterval(room.timerInterval);
-    room.drawOffers = { w: false, b: false };
     io.to(currentRoom).emit('gameOver', 'Anlaşmalı Beraberlik!');
-  });
-
-  socket.on('declineDraw', () => {
-    const room = rooms[currentRoom];
-    if (!room) return;
-    room.drawOffers = { w: false, b: false };
-    socket.to(currentRoom).emit('toast', { msg: 'Beraberlik teklifi reddedildi.', type: 'info' });
   });
 
   socket.on('resign', () => {
@@ -226,28 +202,22 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leaveRoom', () => {
-    cleanUpUserFromRoom(socket, currentRoom, true);
+    cleanUpUserFromRoom(socket, currentRoom);
     currentRoom = null;
     userRole = null;
   });
 
   socket.on('disconnect', () => {
-    cleanUpUserFromRoom(socket, currentRoom, false);
+    cleanUpUserFromRoom(socket, currentRoom);
   });
 });
 
-function cleanUpUserFromRoom(socket, roomId, isIntentionalLeave) {
+function cleanUpUserFromRoom(socket, roomId) {
   if (roomId && rooms[roomId]) {
     const room = rooms[roomId];
-    if (socket.id === room.white) {
-      room.white = null;
-      if (isIntentionalLeave) room.whiteId = null; // Bilinçli çıkışta koltuk tamamen boşalır
-    }
-    if (socket.id === room.black) {
-      room.black = null;
-      if (isIntentionalLeave) room.blackId = null;
-    }
-
+    if (socket.id === room.white) room.white = null;
+    if (socket.id === room.black) room.black = null;
+    
     room.spectators = room.spectators.filter(id => id !== socket.id);
     socket.leave(roomId);
 

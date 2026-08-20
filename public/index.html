@@ -312,21 +312,12 @@
   </div>
 
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
     const socket = io();
-
-    // Sayfa yenilense veya bağlantı kopup yeniden kurulsa bile aynı kalan kimlik.
-    // Sunucu bu kimlik sayesinde koltuğunuzu (beyaz/siyah) izleyiciye düşürmeden geri verir.
-    let playerId = localStorage.getItem('chessPlayerId');
-    if (!playerId) {
-      playerId = 'p_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
-      localStorage.setItem('chessPlayerId', playerId);
-    }
-
     let game = new Chess();
     let board = null;
     let myRole = 'w';
@@ -397,24 +388,14 @@
       socket.emit('joinRoom', {
         roomId: currentRoomId,
         timeConfig: { time: parseInt(timeVal[0]), inc: parseInt(timeVal[1]) },
-        isVsAi: isVsAi,
-        playerId: playerId
+        isVsAi: isVsAi
       });
       initBoard();
     }
 
-    // Bağlantı koptuğunda (örn. internet kesintisi) otomatik olarak aynı odaya,
-    // aynı playerId ile tekrar bağlanmayı dener; böylece koltuk kaybedilmez.
-    socket.on('connect', () => {
-      if (currentRoomId) {
-        socket.emit('joinRoom', { roomId: currentRoomId, playerId: playerId });
-      }
-    });
-
     function goToMainMenu() {
       if (confirm('Ana menüye dönmek istediğinizden emin misiniz?')) {
         socket.emit('leaveRoom');
-        currentRoomId = '';
         game.reset();
         previousFen = '';
         if (board) {
@@ -640,8 +621,6 @@
     socket.on('drawOffered', () => {
       if (confirm('Rakibiniz beraberlik teklif etti. Kabul ediyor musunuz?')) {
         socket.emit('acceptDraw');
-      } else {
-        socket.emit('declineDraw');
       }
     });
 
